@@ -31,7 +31,7 @@
     "expo": "^52.0.0",
     "expo-clipboard": "~7.0.1",
     "expo-constants": "~17.0.8",
-    "expo-device": "^6.0.2",
+    "expo-device": "^58.0.5",
     "expo-haptics": "~13.0.1",
     "expo-local-authentication": "~15.0.2",
     "expo-notifications": "^0.28.0",
