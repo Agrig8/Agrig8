@@ -43,23 +43,23 @@ To provide a programmable safety net for regional commodity trading. Amana ensur
 
 1. `cd frontend`
 2. `cp .env.example .env.local`
-3. `npm install`
-4. `npm run dev`
+3. `corepack pnpm install`
+4. `corepack pnpm dev`
 
 ### Backend setup
 
 1. `cd backend`
 2. `cp .env.example .env`
 3. `cp .env.tracing.example .env.tracing` (for distributed tracing configuration)
-4. `npm install`
-5. `npm run dev`
+4. `corepack pnpm install`
+5. `corepack pnpm dev`
 
 ### Mobile setup
 
 1. `cd mobile`
 2. `cp .env.example .env.local`
-3. `npm install`
-4. `npm start`
+3. `corepack pnpm install`
+4. `corepack pnpm start`
 
 ### Backend API docs
 
@@ -78,15 +78,10 @@ The backend writes `backend/src/docs/openapi.json` from the YAML spec in non-pro
 
 Amana enforces stack-level CI gates on pull requests through `.github/workflows/ci.yml`.
 
-- **Frontend Required Gate**: `npm ci`, `npm run lint`, `npm run build`, `npm test` in `frontend/`
-- **Backend Required Gate**: `npm ci`, `npm run build`, `npm test` in `backend/`
-- **Mobile Required Gate**: `npm ci`, `npm run type-check`, `npm run lint` in `mobil
-Amana enforces stack-level CI gates on pull requests through `.github/workflows/ci.yml`.
-
-- **Frontend Required Gate**: `npm ci`, `npm run lint`, `npm run build`, `npm test` in `frontend/`
-- **Backend Required Gate**: `npm ci`, `npm run build`, `npm test` in `backend/`
-- **Mobile Required Gate**: `npm ci`, `npm run type-check`, `npm run lint` in `mobile/`
-- **Contracts Required Gate**: `cargo test` in `contracts/amana_escrow/`
+- **Frontend Required Gate**: `pnpm install --frozen-lockfile`, lint, build, and Jest tests in `frontend/`; also runs the blocking accessibility suite.
+- **Backend Required Gate**: `pnpm install --frozen-lockfile`, build, and Jest tests in `backend/` with ephemeral Postgres and Redis; also checks admin test coverage, environment examples, and OpenAPI docs.
+- **Mobile Required Gate**: `pnpm install --frozen-lockfile`, TypeScript type-check, ESLint, and Jest tests in `mobile/`.
+- **Contracts Required Gate**: Rust dependency audit, deployment safety checks, `cargo test --locked`, and a WASM release build in `contracts/amana_escrow/`.
 
 Path-aware execution is enabled to avoid unnecessary runtime. If a stack has no changed files, the gate reports a skip-note and passes.
 
@@ -96,9 +91,8 @@ For the protected branch (`main`), set these required status checks:
 
 - `Frontend Required Gate`
 - `Backend Required Gate`
+- `Mobile Required Gate`
 - `Contracts Required Gate`
-
----
 
 ---
 
