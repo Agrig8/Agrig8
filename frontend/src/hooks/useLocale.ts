@@ -27,7 +27,8 @@ export function useLocale(): UseLocaleResult {
   const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
 
   useEffect(() => {
-    setLocaleState(readStoredLocale());
+    const timer = setTimeout(() => setLocaleState(readStoredLocale()), 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const setLocale = useCallback((next: Locale) => {

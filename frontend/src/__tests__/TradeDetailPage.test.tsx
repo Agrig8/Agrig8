@@ -298,6 +298,9 @@ describe("Trade Detail — Freighter signing flow", () => {
     await userEvent.click(screen.getByTestId("action-deposit"));
 
     await waitFor(() => expect(mockDeposit).toHaveBeenCalledWith("jwt-token", "trade-123"));
+    await userEvent.click(
+      await screen.findByRole("button", { name: /sign and submit/i }),
+    );
     await waitFor(() => expect(mockSignTransaction).toHaveBeenCalledWith(
       "unsigned-xdr-payload",
       expect.objectContaining({ networkPassphrase: "Test SDF Network ; September 2015" })
@@ -316,6 +319,9 @@ describe("Trade Detail — Freighter signing flow", () => {
 
     render(<TradeDetailPage />);
     await userEvent.click(screen.getByTestId("action-deposit"));
+    await userEvent.click(
+      await screen.findByRole("button", { name: /sign and submit/i }),
+    );
 
     await waitFor(() =>
       expect(screen.getByText(/signed successfully/i)).toBeInTheDocument()
@@ -337,6 +343,9 @@ describe("Trade Detail — Freighter signing flow", () => {
 
     render(<TradeDetailPage />);
     await userEvent.click(screen.getByTestId("action-deposit"));
+    await userEvent.click(
+      await screen.findByRole("button", { name: /sign and submit/i }),
+    );
 
     await waitFor(() =>
       expect(screen.getByText(/user cancelled signing/i)).toBeInTheDocument()

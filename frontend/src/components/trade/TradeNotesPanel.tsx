@@ -79,7 +79,10 @@ export function TradeNotesPanel({ tradeId, token }: TradeNotesPanelProps) {
   }, [token, tradeId]);
 
   useEffect(() => {
-    void fetchNotes();
+    const timer = setTimeout(() => {
+      void fetchNotes();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [fetchNotes]);
 
   // ── Submit note (optimistic) ────────────────────────────────────────────────

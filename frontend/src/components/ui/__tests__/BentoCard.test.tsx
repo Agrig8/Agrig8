@@ -66,7 +66,7 @@ describe('BentoCard Component', () => {
         const { container } = render(<BentoCard {...defaultProps} />);
         const card = container.firstChild as HTMLElement;
         expect(card).toHaveClass(
-            'bg-[#101E18F2]',
+            'bg-surface-1',
             'border',
             'border-border-default',
             'rounded-2xl',

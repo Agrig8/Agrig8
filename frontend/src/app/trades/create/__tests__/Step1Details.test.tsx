@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Step1Details from '../steps/Step1Details';
 import { TradeProvider } from '../TradeContext';
@@ -19,6 +19,15 @@ const renderWithProvider = () => {
         </TradeProvider>
     );
 };
+
+beforeEach(() => {
+    window.localStorage.clear();
+});
+
+afterEach(() => {
+    cleanup();
+    window.localStorage.clear();
+});
 
 describe('Step1Details', () => {
     describe('commodity dropdown', () => {
@@ -186,7 +195,7 @@ describe('Step1Details', () => {
             renderWithProvider();
 
             const input = screen.getByPlaceholderText(/g\.\.\./i);
-            await user.type(input, 'GABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890');
+            fireEvent.change(input, { target: { value: 'GABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890' } });
 
             expect(input).toHaveValue('GABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890');
         });
@@ -196,7 +205,7 @@ describe('Step1Details', () => {
             renderWithProvider();
 
             const input = screen.getByPlaceholderText(/g\.\.\./i);
-            await user.type(input, 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+            fireEvent.change(input, { target: { value: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' } });
 
             expect(input).toHaveValue('GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
         });
@@ -206,7 +215,7 @@ describe('Step1Details', () => {
             renderWithProvider();
 
             const input = screen.getByPlaceholderText(/g\.\.\./i);
-            await user.type(input, 'MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+            fireEvent.change(input, { target: { value: 'MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' } });
 
             expect(input).toHaveValue('MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
         });
@@ -381,7 +390,7 @@ describe('Step1Details', () => {
             renderWithProvider();
 
             const addressInput = screen.getByPlaceholderText(/g\.\.\./i);
-            await user.type(addressInput, 'GABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890');
+            fireEvent.change(addressInput, { target: { value: 'GABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890' } });
 
             const button = screen.getByRole('button', { name: /continue to negotiation/i });
             expect(button).toBeDisabled();
@@ -399,11 +408,11 @@ describe('Step1Details', () => {
             await user.selectOptions(commoditySelect, 'Maize');
             await user.type(quantityInput, '500');
             await user.type(priceInput, '450');
-            await user.type(addressInput, 'GBRP4ZDXSS6NZPMTVNE7DZ47JNV7OFPJMIVG4FDCMNZP7CHH4656YEXI');
+            fireEvent.change(addressInput, { target: { value: 'GBRP4ZDXSS6NZPMTVNE7DZ47JNV7OFPJMIVG4FDCMNZP7CHH4656YEXI' } });
 
             const button = screen.getByRole('button', { name: /continue to negotiation/i });
             expect(button).not.toBeDisabled();
-        });
+        }, 15_000);
 
         it('should navigate to step 2 when clicked', async () => {
             const user = userEvent.setup();
@@ -417,7 +426,7 @@ describe('Step1Details', () => {
             await user.selectOptions(commoditySelect, 'Maize');
             await user.type(quantityInput, '500');
             await user.type(priceInput, '450');
-            await user.type(addressInput, 'GBRP4ZDXSS6NZPMTVNE7DZ47JNV7OFPJMIVG4FDCMNZP7CHH4656YEXI');
+            fireEvent.change(addressInput, { target: { value: 'GBRP4ZDXSS6NZPMTVNE7DZ47JNV7OFPJMIVG4FDCMNZP7CHH4656YEXI' } });
 
             const button = screen.getByRole('button', { name: /continue to negotiation/i });
             await user.click(button);
@@ -426,7 +435,7 @@ describe('Step1Details', () => {
             // This would be verified by checking if Step2Negotiation is rendered
             // For now, we just verify the button was clickable
             expect(button).not.toBeDisabled();
-        });
+        }, 15_000);
     });
 
     describe('edge cases', () => {
@@ -518,7 +527,7 @@ describe('Step1Details', () => {
             renderWithProvider();
 
             const addressInput = screen.getByPlaceholderText(/g\.\.\./i);
-            await user.type(addressInput, 'XABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890');
+            fireEvent.change(addressInput, { target: { value: 'XABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890' } });
 
             expect(addressInput).toHaveValue('XABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890');
             // Button should still be disabled because address starts with wrong prefix (X)

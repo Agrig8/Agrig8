@@ -1,4 +1,5 @@
 import React from "react";
+import type { ReactNode } from "react";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import SettingsPage from "../page";
 
@@ -11,9 +12,12 @@ const mockAuthBase = {
   isWalletConnected: true,
   isWalletDetected: true,
   isLoading: false,
+  shortAddress: "GABCDE...MNOPXYZ",
+  error: null,
   connectWallet: jest.fn(),
   authenticate: jest.fn(),
   logout: jest.fn(),
+  refreshAuth: jest.fn(),
 };
 
 jest.mock("@/hooks/useAuth", () => ({
@@ -40,7 +44,11 @@ jest.mock("@/lib/api/webhooks", () => ({
 // ── Mock UI components not under test ─────────────────────────────────────────
 
 jest.mock("@/components/ui/ConfirmActionModal", () => ({
-  ConfirmActionModal: ({ open, onConfirm, children }: any) =>
+  ConfirmActionModal: ({
+    open,
+    onConfirm,
+    children,
+  }: { open: boolean; onConfirm: () => void; children?: ReactNode }) =>
     open ? (
       <div data-testid="confirm-modal">
         <button onClick={onConfirm}>Confirm</button>
@@ -89,7 +97,7 @@ describe("Settings – Webhook Management section", () => {
     jest.clearAllMocks();
     // Default: list returns empty
     mockedList.mockResolvedValue({ webhooks: [] });
-    mockedUseAuth.mockReturnValue(mockAuthBase as any);
+    mockedUseAuth.mockReturnValue(mockAuthBase as ReturnType<typeof useAuth>);
   });
 
   test("renders 'Webhooks' heading", async () => {

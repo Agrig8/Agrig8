@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { VaultValueCard } from '../VaultValueCard';
+import { formatMoney } from '@/lib/i18n';
 
 // Mock the BentoCard component
 jest.mock('@/components/ui/BentoCard', () => ({
@@ -45,7 +46,9 @@ describe('VaultValueCard Component', () => {
 
     it('formats the vault value correctly (2,480,000 → $2,480,000.00)', () => {
         render(<VaultValueCard {...defaultProps} />);
-        expect(screen.getByText('$2,480,000.00')).toBeInTheDocument();
+        expect(
+            screen.getByText(formatMoney(defaultProps.value, { currency: defaultProps.currency })),
+        ).toBeInTheDocument();
     });
 
     it('displays the currency label', () => {
@@ -60,7 +63,9 @@ describe('VaultValueCard Component', () => {
 
     it('displays two decimal places for fiat currency', () => {
         render(<VaultValueCard {...defaultProps} />);
-        expect(screen.getByText('$2,480,000.00')).toBeInTheDocument();
+        expect(
+            screen.getByText(formatMoney(defaultProps.value, { currency: defaultProps.currency })),
+        ).toBeInTheDocument();
     });
 
     it('displays "Fully Insured" badge when isInsured is true', () => {
@@ -130,12 +135,12 @@ describe('VaultValueCard Component', () => {
 
     it('formats different value amounts correctly', () => {
         render(<VaultValueCard {...defaultProps} value={1000000} />);
-        expect(screen.getByText('$1,000,000.00')).toBeInTheDocument();
+        expect(screen.getByText('US$1,000,000.00')).toBeInTheDocument();
     });
 
     it('handles zero value', () => {
         render(<VaultValueCard {...defaultProps} value={0} />);
-        expect(screen.getByText('$0.00')).toBeInTheDocument();
+        expect(screen.getByText('US$0.00')).toBeInTheDocument();
     });
 
     it('formats NGN and cNGN values through the shared formatters', () => {

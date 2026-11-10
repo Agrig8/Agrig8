@@ -1,6 +1,8 @@
 import React from "react";
+import type { ReactNode } from "react";
 import { render, screen } from "@testing-library/react";
 import SettingsPage from "../page";
+import { useAuth } from "@/hooks/useAuth";
 
 // ── Mock useAuth ──────────────────────────────────────────────────────────────
 
@@ -9,9 +11,14 @@ const mockAuthBase = {
   isWalletConnected: true,
   isWalletDetected: true,
   isLoading: false,
+  address: "GABCDEFGHIJKLMNOPXYZ",
+  shortAddress: "GABCDE...MNOPXYZ",
+  token: "test-token",
+  error: null,
   connectWallet: jest.fn(),
   authenticate: jest.fn(),
   logout: jest.fn(),
+  refreshAuth: jest.fn(),
 };
 
 jest.mock("@/hooks/useAuth", () => ({
@@ -21,7 +28,11 @@ jest.mock("@/hooks/useAuth", () => ({
 // ── Mock ConfirmActionModal ───────────────────────────────────────────────────
 
 jest.mock("@/components/ui/ConfirmActionModal", () => ({
-  ConfirmActionModal: ({ open, onConfirm, children }: any) =>
+  ConfirmActionModal: ({
+    open,
+    onConfirm,
+    children,
+  }: { open: boolean; onConfirm: () => void; children?: ReactNode }) =>
     open ? (
       <div data-testid="confirm-modal">
         <button onClick={onConfirm}>Confirm</button>
@@ -49,8 +60,6 @@ jest.mock("@/components/ui/EmptyState", () => ({
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-import { useAuth } from "@/hooks/useAuth";
-
 const mockedUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -64,7 +73,7 @@ describe("Settings – Linked Wallets section", () => {
     mockedUseAuth.mockReturnValue({
       ...mockAuthBase,
       address: "GABCDEFGHIJKLMNOPXYZ",
-    } as any);
+    } as ReturnType<typeof useAuth>);
 
     render(<SettingsPage />);
 
@@ -78,7 +87,7 @@ describe("Settings – Linked Wallets section", () => {
     mockedUseAuth.mockReturnValue({
       ...mockAuthBase,
       address: testAddress,
-    } as any);
+    } as ReturnType<typeof useAuth>);
 
     render(<SettingsPage />);
 
@@ -96,7 +105,7 @@ describe("Settings – Linked Wallets section", () => {
       address: null,
       isAuthenticated: false,
       isWalletConnected: false,
-    } as any);
+    } as ReturnType<typeof useAuth>);
 
     render(<SettingsPage />);
 

@@ -44,8 +44,9 @@ export function useFeatureFlags(): UseFeatureFlagsResult {
 
   useEffect(() => {
     mountedRef.current = true;
-    load();
+    const timer = setTimeout(load, 0);
     return () => {
+      clearTimeout(timer);
       mountedRef.current = false;
     };
   }, [load]);

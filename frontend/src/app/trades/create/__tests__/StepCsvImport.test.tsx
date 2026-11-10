@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import StepCsvImport from "../steps/StepCsvImport";
 import type { TradeData } from "../TradeContext";
 
-const VALID_ROW = "Maize,500,kg,450,NGN,GBRPYHIL2CI6PBSMWDTZPOWRFNKPYEF4RCFGSDCYWKRFMZTWSSCMXPST";
+const VALID_ROW = "Maize,500,kg,450,NGN,GDNM7WSJ7VIUVK2TSZ2OQES5XR2663TZEIBFXRDT56B5IRLHERVWSXMU";
 const INVALID_ROW = "BadCommodity,,kg,not-a-price,NGN,INVALID_KEY";
 
 function makeFile(content: string) {

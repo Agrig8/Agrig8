@@ -21,6 +21,50 @@ import {
 } from "./helpers";
 
 type DisputeStatus = "OPEN" | "UNDER_REVIEW" | "RESOLVED" | "CLOSED";
+type SavedView = { name: string; filter: DisputeStatus | "all" };
+
+const SAVED_VIEWS_STORAGE_KEY = "amana:mediator-dispute-views";
+
+function isSavedView(value: unknown): value is SavedView {
+  if (typeof value !== "object" || value === null) return false;
+  const view = value as { name?: unknown; filter?: unknown };
+  return (
+    typeof view.name === "string" &&
+    view.name.trim().length > 0 &&
+    (view.filter === "all" ||
+      view.filter === "OPEN" ||
+      view.filter === "UNDER_REVIEW" ||
+      view.filter === "RESOLVED" ||
+      view.filter === "CLOSED")
+  );
+}
+
+function loadSavedViews(address: string): SavedView[] {
+  try {
+    const stored = window.localStorage.getItem(`${SAVED_VIEWS_STORAGE_KEY}:${address}`);
+    if (!stored) return [];
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) {
+      console.warn("Ignoring malformed saved dispute views");
+      return [];
+    }
+    return parsed.filter(isSavedView);
+  } catch (error) {
+    console.error("Failed to load saved dispute views", error);
+    return [];
+  }
+}
+
+function persistSavedViews(address: string, views: SavedView[]): void {
+  try {
+    window.localStorage.setItem(
+      `${SAVED_VIEWS_STORAGE_KEY}:${address}`,
+      JSON.stringify(views),
+    );
+  } catch (error) {
+    console.error("Failed to save dispute views", error);
+  }
+}
 
 const FILTERS: { label: string; value: DisputeStatus | "all" }[] = [
   { label: "All Active", value: "all" },
@@ -285,6 +329,7 @@ export default function MediatorDisputesPage() {
             + Save view
           </Button>
         )}
+      </div>
       {/* SLA legend */}
       <div className="flex items-center gap-2 mb-4 text-xs text-text-secondary">
         <span

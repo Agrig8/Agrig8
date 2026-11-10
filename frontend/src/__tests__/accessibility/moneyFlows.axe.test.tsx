@@ -1,9 +1,11 @@
-import React from "react";
+import type { ReactNode } from "react";
 import { render } from "@testing-library/react";
 import { axe, toHaveNoViolations } from "jest-axe";
 import { CurrencyInput } from "@/components/ui/CurrencyInput";
 import { VideoUploadCard } from "@/components/ui/VideoUploadCard";
 import { ConfirmActionModal } from "@/components/ui/ConfirmActionModal";
+import type { AssetInfo } from "@/lib/stellar/assets";
+import type { IconProps } from "@/components/ui/Icon";
 
 expect.extend(toHaveNoViolations);
 
@@ -13,13 +15,20 @@ jest.mock("@/lib/stellar/assets", () => ({
 
 // Mock BentoCard for VideoUploadCard
 jest.mock("@/components/ui/BentoCard", () => ({
-  BentoCard: ({ children }: any) => <div>{children}</div>,
+  BentoCard: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 jest.mock("@/components/ui/Icon", () => ({
-  Icon: (props: any) => <span {...props} />,
+  Icon: (props: IconProps) => <span aria-label={props["aria-label"]} />,
 }));
 
-const mockAsset = { symbol: "cNGN", decimals: 2, name: "cNGN", code: "cNGN", issuer: "G...", contractId: "C..." } as any;
+const mockAsset: AssetInfo = {
+  symbol: "cNGN",
+  decimals: 2,
+  name: "cNGN",
+  code: "cNGN",
+  issuer: "G...",
+  type: "credit_alphanum4",
+};
 
 describe("Money-action flows — axe WCAG 2.1 AA", () => {
   describe("CurrencyInput", () => {
@@ -75,7 +84,7 @@ describe("Money-action flows — axe WCAG 2.1 AA", () => {
   });
 
   describe("TradeListItem — keyboard accessible", () => {
-    it("outer div has role=button, tabIndex=0, and aria-label", async () => {
+    it("trade details are a named button without nesting action buttons", async () => {
       const { TradeListItem } = await import("@/components/trade/TradeListItem");
       const { container } = render(
         <TradeListItem
@@ -89,9 +98,9 @@ describe("Money-action flows — axe WCAG 2.1 AA", () => {
           onDeposit={() => {}}
         />
       );
-      const card = container.querySelector('[role="button"]') as HTMLElement;
+      const card = container.querySelector('button[aria-label^="View trade t-1"]') as HTMLButtonElement;
       expect(card).toBeTruthy();
-      expect(card.getAttribute("tabIndex")).toBe("0");
+      expect(card.tabIndex).toBe(0);
       expect(card.getAttribute("aria-label")).toMatch(/View trade t-1/);
       const depositBtn = container.querySelector('button[aria-label*="Deposit"]');
       expect(depositBtn).toBeTruthy();
