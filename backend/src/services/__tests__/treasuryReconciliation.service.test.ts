@@ -45,7 +45,7 @@ describe("TreasuryReconciliationService", () => {
     const report = await svc.run();
     expect(report.severity).toBe("warning");
     expect(alertService.dispatch).toHaveBeenCalledWith(
-      "treasury_reconciliation_warning",
+      "reconciliation_drift_warning",
       expect.stringContaining("warning"),
       expect.any(Object),
     );
@@ -57,7 +57,7 @@ describe("TreasuryReconciliationService", () => {
     const report = await svc.run();
     expect(report.severity).toBe("critical");
     expect(alertService.dispatch).toHaveBeenCalledWith(
-      "treasury_reconciliation_critical",
+      "reconciliation_drift_critical",
       expect.stringContaining("critical"),
       expect.any(Object),
     );

@@ -13,12 +13,14 @@
  */
 
 import { clsx } from "clsx";
+import { useEffect, useState } from "react";
 
 interface StalenessIndicatorProps {
   isStale: boolean;
   isOffline: boolean;
   /** Unix ms timestamp from CacheEntry.cachedAt */
   cachedAt: number | null;
+  now?: number;
   className?: string;
 }
 
@@ -34,11 +36,24 @@ export function StalenessIndicator({
   isStale,
   isOffline,
   cachedAt,
+  now,
   className,
 }: StalenessIndicatorProps) {
+  const [currentTime, setCurrentTime] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (now !== undefined) return;
+    const timer = setTimeout(() => setCurrentTime(Date.now()), 0);
+    return () => clearTimeout(timer);
+  }, [cachedAt, now]);
+
   if (!isStale && !isOffline) return null;
 
-  const elapsed = cachedAt ? Date.now() - cachedAt : null;
+  const referenceTime = now ?? currentTime;
+  const elapsed =
+    cachedAt !== null && referenceTime !== null
+      ? referenceTime - cachedAt
+      : null;
   const label = isOffline ? "Offline" : "Stale";
   const timeLabel = elapsed !== null ? formatElapsed(elapsed) : null;
 

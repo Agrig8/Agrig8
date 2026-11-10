@@ -53,11 +53,13 @@ describe("StalenessIndicator", () => {
   });
 
   it("shows elapsed time in stale badge (e.g. 1m ago)", () => {
+    const now = Date.now();
     render(
       <StalenessIndicator
         isStale={true}
         isOffline={false}
-        cachedAt={Date.now() - 90_000} // 1m 30s ago
+        cachedAt={now - 90_000}
+        now={now}
       />,
     );
     expect(screen.getByTestId("staleness-indicator").textContent).toMatch(

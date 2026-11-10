@@ -443,7 +443,7 @@ describe("useCurrencyInput", () => {
         result.current.setValue("10,5");
       });
 
-      expect(onValidChange).toHaveBeenCalledWith("1050000000");
+      expect(onValidChange).toHaveBeenCalledWith("105000000");
     });
 
     it("handles very small amounts", () => {

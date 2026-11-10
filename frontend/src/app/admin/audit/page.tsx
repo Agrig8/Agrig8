@@ -40,6 +40,8 @@ function formatAction(action: string): string {
 function parseSafePage(raw: string | null): number {
   const n = parseInt(raw ?? "1", 10);
   return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
 export interface AdminAuditFilters {
   actor: string;
   action: string;

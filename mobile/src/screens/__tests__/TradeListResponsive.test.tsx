@@ -11,11 +11,26 @@ const trades = [
   { tradeId: 'trade-aaaaaaaa', status: 'FUNDED', amountUsdc: '10', buyerAddress: 'GBUYER0000000001', sellerAddress: 'GSELLER000000001' },
   { tradeId: 'trade-bbbbbbbb', status: 'PENDING', amountUsdc: '20', buyerAddress: 'GBUYER0000000002', sellerAddress: 'GSELLER000000002' },
 ];
+const mockFetchTrades = jest.fn();
+const mockClearErrorView = jest.fn();
+const mockLoadPending = jest.fn().mockResolvedValue(undefined);
+const mockSyncPending = jest.fn().mockResolvedValue(null);
+const mockRetryPending = jest.fn().mockResolvedValue(undefined);
+const mockDismissPending = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('../../stores/tradeStore', () => ({
-  useTradeStore: () => ({ trades, isLoading: false, errorView: null, fetchTrades: jest.fn(), clearErrorView: jest.fn() }),
+  useTradeStore: () => ({ trades, isLoading: false, errorView: null, fetchTrades: mockFetchTrades, clearErrorView: mockClearErrorView }),
 }));
 jest.mock('../../stores/authStore', () => ({ useAuthStore: () => ({ clearAuth: jest.fn() }) }));
+jest.mock('../../stores/pendingTradeStore', () => ({
+  usePendingTradeStore: () => ({
+    pendingTrades: [],
+    load: mockLoadPending,
+    sync: mockSyncPending,
+    retry: mockRetryPending,
+    dismiss: mockDismissPending,
+  }),
+}));
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 jest.mock('../TradeDetailScreen', () => {
   const { Text } = jest.requireActual('react-native');

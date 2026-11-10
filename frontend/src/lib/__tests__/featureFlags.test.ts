@@ -81,9 +81,13 @@ describe("Feature Flags", () => {
       delete process.env.NEXT_PUBLIC_ENABLE_ADMIN_UI;
       const flags = getFeatureFlags();
       
-      // All flags should default to false for safety
-      Object.values(flags).forEach((flag) => {
-        expect(flag).toBe(false);
+      expect(flags).toEqual({
+        adminUI: false,
+        clawbackUI: false,
+        advancedReporting: false,
+        offlineBanner: true,
+        tradeWizardV2: false,
+        multiCurrency: false,
       });
     });
   });

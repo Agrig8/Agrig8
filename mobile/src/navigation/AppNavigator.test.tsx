@@ -1,19 +1,25 @@
-import React from 'react';
+import type { ForwardedRef, ReactNode } from 'react';
 import { render } from '@testing-library/react-native';
 import { AppNavigator } from './AppNavigator';
 import * as useDeepLinkHook from '../hooks/useDeepLink';
 
 // Mock React Navigation
 jest.mock('@react-navigation/native', () => ({
-  NavigationContainer: ({ children }: any) => children,
+  NavigationContainer: jest.requireActual<typeof import('react')>('react').forwardRef(
+    ({ children }: { children: ReactNode }, _ref: ForwardedRef<unknown>) => children,
+  ),
   useFocusEffect: jest.fn(),
   useNavigation: jest.fn(),
 }));
 
 jest.mock('@react-navigation/stack', () => ({
   createStackNavigator: () => ({
-    Navigator: ({ children, initialRouteName, screenOptions }: any) => children,
-    Screen: ({ name, component: Component }: any) => <Component name={name} />,
+    Navigator: ({ children }: { children: ReactNode }) => children,
+    Screen: ({ name }: { name: string }) => {
+      const React = jest.requireActual<typeof import('react')>('react');
+      const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
+      return React.createElement(Text, null, name);
+    },
   }),
 }));
 
@@ -44,7 +50,9 @@ describe('AppNavigator', () => {
   it('should render with authenticated user', () => {
     (useDeepLinkHook.useDeepLink as jest.Mock).mockReturnValue({
       pendingDeepLink: null,
+      handleUrl: jest.fn(),
       handleDeepLink: jest.fn(),
+      resumePendingDeepLink: jest.fn(),
       navigateToDeepLink: jest.fn(),
     });
 
@@ -56,7 +64,9 @@ describe('AppNavigator', () => {
   it('should render with unauthenticated user', () => {
     (useDeepLinkHook.useDeepLink as jest.Mock).mockReturnValue({
       pendingDeepLink: null,
+      handleUrl: jest.fn(),
       handleDeepLink: jest.fn(),
+      resumePendingDeepLink: jest.fn(),
       navigateToDeepLink: jest.fn(),
     });
 
@@ -65,81 +75,81 @@ describe('AppNavigator', () => {
     expect(toJSON()).toBeTruthy();
   });
 
-  it('should handle trade deep link', () => {
-    const handleDeepLinkMock = jest.fn();
-    const pendingDeepLink = {
-      screen: 'TradeDetail',
-      params: { id: 'trade-123' },
-    };
-
+  it('resumes a pending deep link when the user is authenticated', () => {
+    const resumePendingDeepLinkMock = jest.fn();
     (useDeepLinkHook.useDeepLink as jest.Mock).mockReturnValue({
-      pendingDeepLink,
-      handleDeepLink: handleDeepLinkMock,
+      pendingDeepLink: { screen: 'TradeDetail', params: { id: 'trade-123' } },
+      handleUrl: jest.fn(),
+      handleDeepLink: jest.fn(),
+      resumePendingDeepLink: resumePendingDeepLinkMock,
       navigateToDeepLink: jest.fn(),
     });
 
     render(<AppNavigator isAuthenticated={true} />);
 
-    expect(handleDeepLinkMock).toHaveBeenCalled();
+    expect(resumePendingDeepLinkMock).toHaveBeenCalled();
   });
 
-  it('should handle dispute deep link', () => {
-    const handleDeepLinkMock = jest.fn();
-    const pendingDeepLink = {
-      screen: 'DisputeDetail',
-      params: { id: 'dispute-456' },
-    };
-
+  it('does not resume a pending deep link while unauthenticated', () => {
+    const resumePendingDeepLinkMock = jest.fn();
     (useDeepLinkHook.useDeepLink as jest.Mock).mockReturnValue({
-      pendingDeepLink,
-      handleDeepLink: handleDeepLinkMock,
+      pendingDeepLink: { screen: 'DisputeDetail', params: { id: 'dispute-456' } },
+      handleUrl: jest.fn(),
+      handleDeepLink: jest.fn(),
+      resumePendingDeepLink: resumePendingDeepLinkMock,
       navigateToDeepLink: jest.fn(),
     });
 
-    render(<AppNavigator isAuthenticated={true} />);
+    render(<AppNavigator isAuthenticated={false} />);
 
-    expect(handleDeepLinkMock).toHaveBeenCalled();
+    expect(resumePendingDeepLinkMock).not.toHaveBeenCalled();
   });
 
   it('should render all non-admin screens in stack', () => {
     (useDeepLinkHook.useDeepLink as jest.Mock).mockReturnValue({
       pendingDeepLink: null,
+      handleUrl: jest.fn(),
       handleDeepLink: jest.fn(),
+      resumePendingDeepLink: jest.fn(),
       navigateToDeepLink: jest.fn(),
     });
 
     const { getByText } = render(<AppNavigator isAuthenticated={true} />);
 
     // Core screens should be rendered
-    expect(getByText('TradeListScreen')).toBeTruthy();
-    expect(getByText('TradeDetailScreen')).toBeTruthy();
-    expect(getByText('DisputeDetailScreen')).toBeTruthy();
+    expect(getByText('TradeList')).toBeTruthy();
+    expect(getByText('TradeDetail')).toBeTruthy();
+    expect(getByText('DisputeDetail')).toBeTruthy();
   });
 
   // Issue #100: admin screens are only registered for admin users
   it('does not register admin screens for non-admin users', () => {
     (useDeepLinkHook.useDeepLink as jest.Mock).mockReturnValue({
       pendingDeepLink: null,
+      handleUrl: jest.fn(),
       handleDeepLink: jest.fn(),
+      resumePendingDeepLink: jest.fn(),
       navigateToDeepLink: jest.fn(),
     });
 
     const { queryByText } = render(<AppNavigator isAuthenticated={true} isAdmin={false} />);
 
-    expect(queryByText('AdminStreamsOverviewScreen')).toBeNull();
-    expect(queryByText('AdminTradesBatchScreen')).toBeNull();
+    expect(queryByText('AdminStreamsOverview')).toBeNull();
+    expect(queryByText('AdminTradesBatch')).toBeNull();
   });
 
   it('registers admin screens for admin users', async () => {
     (useDeepLinkHook.useDeepLink as jest.Mock).mockReturnValue({
       pendingDeepLink: null,
+      handleUrl: jest.fn(),
       handleDeepLink: jest.fn(),
+      resumePendingDeepLink: jest.fn(),
       navigateToDeepLink: jest.fn(),
     });
 
     const { findByText } = render(<AppNavigator isAuthenticated={true} isAdmin={true} />);
 
-    expect(await findByText('AdminStreamsOverviewScreen')).toBeTruthy();
-    expect(await findByText('AdminTradesBatchScreen')).toBeTruthy();
+    expect(await findByText('AdminStreamsOverview')).toBeTruthy();
+    expect(await findByText('AdminTradesBatch')).toBeTruthy();
   });
 });

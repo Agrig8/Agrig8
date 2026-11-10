@@ -18,6 +18,8 @@ import {
   QUOTA_BYTES,
 } from "@/lib/offlineCache";
 
+const DEMO_NOW = Date.parse("2026-01-01T00:00:00Z");
+
 export function OfflineCacheFixtures() {
   const [readResult, setReadResult] = useState<string>("—");
   const [usageBytes, setUsageBytes] = useState(0);
@@ -104,7 +106,7 @@ export function OfflineCacheFixtures() {
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-3">
               <span className="text-xs text-text-muted w-24">Fresh:</span>
-              <StalenessIndicator isStale={false} isOffline={false} cachedAt={Date.now()} />
+              <StalenessIndicator isStale={false} isOffline={false} cachedAt={DEMO_NOW} now={DEMO_NOW} />
               <span className="text-xs text-text-muted italic">(no badge rendered)</span>
             </div>
             <div className="flex items-center gap-3">
@@ -112,7 +114,8 @@ export function OfflineCacheFixtures() {
               <StalenessIndicator
                 isStale={true}
                 isOffline={false}
-                cachedAt={Date.now() - 8 * 60 * 1000}
+                cachedAt={DEMO_NOW - 8 * 60 * 1000}
+                now={DEMO_NOW}
               />
             </div>
             <div className="flex items-center gap-3">
@@ -120,7 +123,8 @@ export function OfflineCacheFixtures() {
               <StalenessIndicator
                 isStale={true}
                 isOffline={true}
-                cachedAt={Date.now() - 12 * 60 * 1000}
+                cachedAt={DEMO_NOW - 12 * 60 * 1000}
+                now={DEMO_NOW}
               />
             </div>
           </div>

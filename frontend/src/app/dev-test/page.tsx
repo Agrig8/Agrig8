@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { Spinner } from "@/components/ui/Spinner";
@@ -7,6 +6,7 @@ import { StepIndicator } from "@/components/ui/StepIndicator";
 import { TradeListItemDemo } from "./TradeListItemDemo";
 import { ErrorBoundaryFixtures } from "./ErrorBoundaryFixtures";
 import { OfflineCacheFixtures } from "./OfflineCacheFixtures";
+import { assertDevelopmentOnly } from "./pageGuard";
 const STEPS = [
   { label: "Create Trade", description: "3-step flow" },
   { label: "Verification", description: "4-step flow" },
@@ -30,9 +30,7 @@ const SAMPLE_ICONS = [
 ];
 
 export default function IconDevPage() {
-  if (process.env.NODE_ENV === "production") {
-    notFound();
-  }
+  assertDevelopmentOnly(process.env["NODE_ENV"] ?? "development");
 
   return (
     <div className="min-h-screen bg-primary p-10">

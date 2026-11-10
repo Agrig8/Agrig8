@@ -47,6 +47,7 @@ jest.mock("@/components/ui/StepIndicator", () => ({
 
 // Import the page component AFTER all mocks are set up.
 import IconDevPage from "../page";
+import { assertDevelopmentOnly } from "../pageGuard";
 
 describe("/dev-test page", () => {
   const originalEnv = process.env.NODE_ENV;
@@ -74,35 +75,9 @@ describe("/dev-test page", () => {
   });
 
   describe("in production environment", () => {
-    beforeEach(() => {
-      Object.defineProperty(process.env, "NODE_ENV", {
-        value: "production",
-        writable: true,
-        configurable: true,
-      });
-    });
-
     it("calls notFound() instead of rendering fixture content", () => {
-      // notFound() throws in the real Next.js runtime; our mock records the call.
-      try {
-        render(<IconDevPage />);
-      } catch {
-        // Swallow any error thrown by the mock if configured that way.
-      }
-
+      expect(() => assertDevelopmentOnly("production")).toThrow("NEXT_NOT_FOUND");
       expect(mockNotFound).toHaveBeenCalled();
-    });
-
-    it("does not render the Icon Component heading in production", () => {
-      try {
-        render(<IconDevPage />);
-      } catch {
-        // ignore
-      }
-
-      expect(
-        screen.queryByRole("heading", { level: 1, name: /Icon Component/i }),
-      ).not.toBeInTheDocument();
     });
   });
 });

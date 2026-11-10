@@ -178,7 +178,7 @@ describe("GlobalSearch — search input", () => {
     render(<GlobalSearch />);
     pressMetaK();
 
-    await user.type(screen.getByRole("searchbox"), "maize");
+    await user.type(screen.getByRole("combobox"), "maize");
     expect(mockSearch).not.toHaveBeenCalled();
 
     act(() => jest.advanceTimersByTime(300));
@@ -194,8 +194,8 @@ describe("GlobalSearch — search input", () => {
     render(<GlobalSearch />);
     pressMetaK();
 
-    await user.type(screen.getByRole("searchbox"), "m");
-    await user.clear(screen.getByRole("searchbox"));
+    await user.type(screen.getByRole("combobox"), "m");
+    await user.clear(screen.getByRole("combobox"));
     act(() => jest.advanceTimersByTime(300));
     expect(mockSearch).not.toHaveBeenCalled();
 
@@ -212,7 +212,7 @@ describe("GlobalSearch — results display", () => {
 
     render(<GlobalSearch />);
     pressMetaK();
-    await user.type(screen.getByRole("searchbox"), "trade");
+    await user.type(screen.getByRole("combobox"), "trade");
     act(() => jest.advanceTimersByTime(300));
 
     await waitFor(() => expect(screen.getByText("Trade #001")).toBeInTheDocument());
@@ -234,7 +234,7 @@ describe("GlobalSearch — results display", () => {
 
     render(<GlobalSearch />);
     pressMetaK();
-    await user.type(screen.getByRole("searchbox"), "trade");
+    await user.type(screen.getByRole("combobox"), "trade");
     act(() => jest.advanceTimersByTime(300));
 
     await waitFor(() => expect(screen.getByText("FUNDED")).toBeInTheDocument());
@@ -253,7 +253,7 @@ describe("GlobalSearch — empty results", () => {
 
     render(<GlobalSearch />);
     pressMetaK();
-    await user.type(screen.getByRole("searchbox"), "xyznotfound");
+    await user.type(screen.getByRole("combobox"), "xyznotfound");
     act(() => jest.advanceTimersByTime(300));
 
     await waitFor(() => expect(screen.getByText(/no results for/i)).toBeInTheDocument());
@@ -272,7 +272,7 @@ describe("GlobalSearch — error state", () => {
 
     render(<GlobalSearch />);
     pressMetaK();
-    await user.type(screen.getByRole("searchbox"), "trade");
+    await user.type(screen.getByRole("combobox"), "trade");
     act(() => jest.advanceTimersByTime(300));
 
     await waitFor(() => expect(screen.getByText(/search failed/i)).toBeInTheDocument());
@@ -290,7 +290,7 @@ describe("GlobalSearch — navigation on select", () => {
 
     render(<GlobalSearch />);
     pressMetaK();
-    await user.type(screen.getByRole("searchbox"), "trade");
+    await user.type(screen.getByRole("combobox"), "trade");
     act(() => jest.advanceTimersByTime(300));
     await waitFor(() => screen.getByText("Trade #001"));
 
@@ -307,13 +307,13 @@ describe("GlobalSearch — navigation on select", () => {
 
     render(<GlobalSearch />);
     pressMetaK();
-    await user.type(screen.getByRole("searchbox"), "trade");
+    await user.type(screen.getByRole("combobox"), "trade");
     act(() => jest.advanceTimersByTime(300));
     await waitFor(() => screen.getByText("Trade #001"));
 
     // First ArrowDown selects index 0 (Trade #001)
-    fireEvent.keyDown(screen.getByRole("searchbox"), { key: "ArrowDown" });
-    fireEvent.keyDown(screen.getByRole("searchbox"), { key: "Enter" });
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "ArrowDown" });
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" });
 
     jest.useRealTimers();
 

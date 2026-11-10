@@ -45,8 +45,7 @@ export function TradeListItem({
   const statusStyle = STATUS_STYLES[status] ?? STATUS_STYLES["DRAFT"];
   const [copied, setCopied] = useState(false);
 
-  const handleCopyLink = async (e: React.MouseEvent | React.KeyboardEvent) => {
-    e.stopPropagation();
+  const handleCopyLink = async () => {
     const url = `${window.location.origin}/trades/${tradeId}`;
     try {
       await navigator.clipboard.writeText(url);
@@ -69,49 +68,37 @@ export function TradeListItem({
   };
 
   return (
-    <div
-      onClick={onView}
-      role="button"
-      tabIndex={0}
-      aria-label={`View trade ${tradeId} — ${commodity} ${amountCngn} cNGN, status ${status}`}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onView();
-        }
-      }}
-      className="flex items-center justify-between p-4 bg-card border border-border-default rounded-lg mb-3 hover:border-gold/30 hover:bg-elevated transition-colors cursor-pointer group focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2"
-    >
-      {/* Left — commodity + meta */}
-      <div className="flex flex-col gap-1 min-w-0">
-        <span className="text-lg font-medium text-text-primary truncate">
-          {commodity}
+    <div className="flex items-center justify-between gap-3 p-4 bg-card border border-border-default rounded-lg mb-3 hover:border-gold/30 hover:bg-elevated transition-colors group">
+      <button
+        type="button"
+        onClick={onView}
+        aria-label={`View trade ${tradeId} — ${commodity} ${amountCngn} cNGN, status ${status}`}
+        className="flex min-w-0 flex-1 items-center justify-between gap-4 rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2"
+      >
+        <span className="flex min-w-0 flex-col gap-1">
+          <span className="text-lg font-medium text-text-primary truncate">
+            {commodity}
+          </span>
+
+          <span className="flex items-center gap-2 flex-wrap">
+            <span className="bg-white/5 text-teal text-xs px-2 py-1 rounded">
+              {counterparty.role}
+            </span>
+            <span className="font-mono text-text-muted text-sm">
+              {truncateAddress(counterparty.address)}
+            </span>
+          </span>
+
+          <span className="font-mono text-text-muted text-sm">{tradeId}</span>
         </span>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="bg-white/5 text-teal text-xs px-2 py-1 rounded">
-            {counterparty.role}
-          </span>
-          <span className="font-mono text-text-muted text-sm">
-            {truncateAddress(counterparty.address)}
-          </span>
-        </div>
-
-        <span className="font-mono text-text-muted text-sm">{tradeId}</span>
-      </div>
-
-      {/* Right — amount + status + actions */}
-      <div
-        className="flex items-center gap-3"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="hidden sm:flex flex-col items-end gap-1">
+        <span className="hidden sm:flex flex-col items-end gap-1">
           <span className="text-text-primary font-semibold text-sm">
             {amountCngn}{" "}
             <span className="text-text-muted font-normal">cNGN</span>
           </span>
           <span className="text-text-muted text-xs">{createdAt}</span>
-        </div>
+        </span>
 
         <span
           className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold tracking-wide ${statusStyle}`}
@@ -119,67 +106,56 @@ export function TradeListItem({
           <span className="w-1.5 h-1.5 rounded-full bg-current" />
           {status}
         </span>
+      </button>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleCopyLink}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                handleCopyLink(e);
-              }
-            }}
-            aria-label={copied ? `Link copied for trade ${tradeId}` : `Copy link to trade ${tradeId}`}
-            title={copied ? "Link copied!" : "Copy link"}
-            className="p-2 rounded-lg border border-border-default text-text-muted hover:border-border-hover hover:text-text-primary transition-colors focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2"
-          >
-            {copied ? (
-              <Check aria-hidden="true" className="w-4 h-4 text-status-success" />
-            ) : (
-              <Link2 aria-hidden="true" className="w-4 h-4" />
-            )}
-          </button>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onView();
-            }}
-            aria-label={`View trade ${tradeId}`}
-            title="View trade"
-            className="p-2 rounded-lg border border-border-default text-text-muted hover:border-border-hover hover:text-text-primary transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2"
-          >
-            <Eye aria-hidden="true" className="w-4 h-4" />
-          </button>
-
-          {onDeposit && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeposit();
-              }}
-              aria-label={`Deposit for trade ${tradeId}`}
-              title="Deposit"
-              className="p-2 rounded-lg border border-border-default text-text-muted hover:border-emerald/40 hover:text-emerald transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2"
-            >
-              <ArrowDownToLine aria-hidden="true" className="w-4 h-4" />
-            </button>
+      <div className="flex shrink-0 items-center gap-3">
+        <button
+          onClick={handleCopyLink}
+          type="button"
+          aria-label={copied ? `Link copied for trade ${tradeId}` : `Copy link to trade ${tradeId}`}
+          title={copied ? "Link copied!" : "Copy link"}
+          className="p-2 rounded-lg border border-border-default text-text-muted hover:border-border-hover hover:text-text-primary transition-colors focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2"
+        >
+          {copied ? (
+            <Check aria-hidden="true" className="w-4 h-4 text-status-success" />
+          ) : (
+            <Link2 aria-hidden="true" className="w-4 h-4" />
           )}
+        </button>
 
-          {onWithdraw && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onWithdraw();
-              }}
-              aria-label={`Withdraw for trade ${tradeId}`}
-              title="Withdraw"
-              className="p-2 rounded-lg border border-border-default text-text-muted hover:border-status-danger/40 hover:text-status-danger transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2"
-            >
-              <ArrowUpFromLine aria-hidden="true" className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        <button
+          onClick={onView}
+          type="button"
+          aria-label={`View trade ${tradeId}`}
+          title="View trade"
+          className="p-2 rounded-lg border border-border-default text-text-muted hover:border-border-hover hover:text-text-primary transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2"
+        >
+          <Eye aria-hidden="true" className="w-4 h-4" />
+        </button>
+
+        {onDeposit && (
+          <button
+            onClick={onDeposit}
+            type="button"
+            aria-label={`Deposit for trade ${tradeId}`}
+            title="Deposit"
+            className="p-2 rounded-lg border border-border-default text-text-muted hover:border-emerald/40 hover:text-emerald transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2"
+          >
+            <ArrowDownToLine aria-hidden="true" className="w-4 h-4" />
+          </button>
+        )}
+
+        {onWithdraw && (
+          <button
+            onClick={onWithdraw}
+            type="button"
+            aria-label={`Withdraw for trade ${tradeId}`}
+            title="Withdraw"
+            className="p-2 rounded-lg border border-border-default text-text-muted hover:border-status-danger/40 hover:text-status-danger transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2"
+          >
+            <ArrowUpFromLine aria-hidden="true" className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </div>
   );

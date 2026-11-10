@@ -172,7 +172,7 @@ jobs:
       - name: Test
         if: needs.changes.outputs.frontend == 'true'
         # --json writes a machine-readable result file used by the flake reporter
-        run: pnpm test -- --json --outputFile=jest-results.json || true
+        run: pnpm test --json --outputFile=jest-results.json || true
 
       - name: Detect flake candidates (frontend)
         if: needs.changes.outputs.frontend == 'true'
@@ -196,7 +196,7 @@ jobs:
 
       - name: A11y axe audit (blocking)
         if: needs.changes.outputs.frontend == 'true'
-        run: pnpm test -- src/__tests__/accessibility --verbose
+        run: pnpm test src/__tests__/accessibility --verbose
 
       - name: Upload coverage report
         if: needs.changes.outputs.frontend == 'true'
@@ -452,7 +452,7 @@ jobs:
           DATABASE_URL: postgresql://postgres:password@localhost:5433/amana_test
           REDIS_URL: redis://localhost:6381
         # --json writes a machine-readable result file used by the flake reporter
-        run: pnpm test -- --json --outputFile=jest-results.json || true
+        run: pnpm test --json --outputFile=jest-results.json || true
 
       - name: Detect flake candidates (backend)
         if: needs.changes.outputs.backend == 'true'
@@ -761,10 +761,11 @@ jobs:
           key: cargo-audit-${{ runner.os }}-v0.22
 
       - name: Install cargo-audit
-        if: steps.cache-cargo-audit.outputs.cache-hit != 'true'
+        if: needs.changes.outputs.contracts == 'true' && steps.cache-cargo-audit.outputs.cache-hit != 'true'
         run: cargo install cargo-audit --locked
 
       - name: Security audit (cargo)
+        if: needs.changes.outputs.contracts == 'true'
         working-directory: contracts
         run: cargo audit
 

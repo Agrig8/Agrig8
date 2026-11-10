@@ -69,15 +69,11 @@ export default function AdminStreamsOverviewScreen({
   navigation,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const { role, clearAuth } = useAuthStore() as unknown as {
-    role: 'admin' | 'user' | null;
-    clearAuth: () => Promise<void>;
-  };
+  const { isAdmin, clearAuth } = useAuthStore();
   const { isOffline } = useNetworkStatus();
   const queuedActions = useOfflineQueueStore((s) => s.actions);
   const retryQueuedAction = useOfflineQueueStore((s) => s.retry);
   const hasFailedActions = queuedActions.some((a) => a.status === 'failed');
-  const isAdmin = role === 'admin';
   const { addAction } = useAdminActionHistoryStore();
 
   /**

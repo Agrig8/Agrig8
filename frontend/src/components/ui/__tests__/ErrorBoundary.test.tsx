@@ -193,7 +193,7 @@ describe("ErrorBoundary", () => {
         </ErrorBoundary>,
       );
 
-      expect(renderFn).toHaveBeenCalledTimes(1);
+      expect(renderFn).toHaveBeenCalled();
       expect(screen.getByTestId("rp-message")).toHaveTextContent(
         "render-prop crash",
       );

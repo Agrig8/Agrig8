@@ -4,6 +4,7 @@ import { useTradeStore } from './tradeStore';
 import { tradeApi } from '../api/trade';
 import { AdminApiError } from '../api/errors';
 import { NETWORK_ERROR_CODE } from '../api/errorInterceptor';
+import type { Trade } from '../types/trade';
 
 jest.mock('../api/trade', () => ({
   tradeApi: {
@@ -231,10 +232,16 @@ describe('useTradeStore — error slot routing', () => {
     // Minimal currentTrade stub — only `tradeId` is needed to make the
     // `if (get().currentTrade)` gate inside releaseFunds/deposit fire
     // so the silent-refresh branch runs.
-    const baseTrade = {
+    const baseTrade: Trade = {
+      id: 1,
       tradeId: 'trade-1',
+      buyerAddress: 'GBUYERAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+      sellerAddress: 'GSELLERAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+      amountUsdc: '1000',
       status: 'PENDING',
-    } as any;
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
 
     // ----- releaseFunds path -----
     act(() => {

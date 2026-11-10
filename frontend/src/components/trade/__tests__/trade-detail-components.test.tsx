@@ -123,7 +123,7 @@ describe("trade detail component coverage", () => {
 
     expect(screen.getByText("Vault Amount Locked")).toBeInTheDocument();
     expect(screen.getByText("25,000.00")).toBeInTheDocument();
-    expect(screen.getByText("≈ ₦40,000.00")).toBeInTheDocument();
+    expect(screen.getByText("≈ ₦40,000,000.00")).toBeInTheDocument();
     expect(screen.getByText("Asset Value")).toBeInTheDocument();
     expect(screen.getByText("24,000.00 cNGN")).toBeInTheDocument();
     expect(screen.getByText("Platform Fee (2%)")).toBeInTheDocument();

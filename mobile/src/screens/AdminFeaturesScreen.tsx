@@ -36,8 +36,7 @@ type Props = StackScreenProps<RootStackParamList, 'AdminFeatures'>;
  */
 export default function AdminFeaturesScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { role, clearAuth } = useAuthStore();
-  const isAdmin = role === 'admin';
+  const { isAdmin, clearAuth } = useAuthStore();
 
   const [flags, setFlags] = useState<Record<string, FeatureFlag> | null>(
     null,

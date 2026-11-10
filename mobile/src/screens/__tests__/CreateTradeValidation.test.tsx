@@ -9,6 +9,7 @@
 
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import CreateTradeScreen from '../CreateTradeScreen';
+import { createTestNavigation, createTestRoute } from '../../test-utils/navigation';
 
 jest.mock('@react-navigation/stack', () => ({
   createStackNavigator: jest.fn(),
@@ -18,7 +19,7 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../stores/tradeStore', () => ({
+jest.mock('../../stores/tradeStore', () => ({
   useTradeStore: () => ({ createTrade: jest.fn() }),
 }));
 
@@ -26,7 +27,7 @@ const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
 const mockReplace = jest.fn();
 
-const mockNavigation = {
+const mockNavigation = createTestNavigation<'CreateTrade'>({
   navigate: mockNavigate,
   goBack: mockGoBack,
   replace: mockReplace,
@@ -40,16 +41,16 @@ const mockNavigation = {
   getParent: jest.fn(),
   getState: jest.fn(),
   setParams: jest.fn(),
-} as any;
+});
 
-const mockRoute = { key: 'CreateTrade', name: 'CreateTrade', params: undefined } as any;
+const mockRoute = createTestRoute('CreateTrade', undefined);
 
 function renderScreen() {
   return render(<CreateTradeScreen navigation={mockNavigation} route={mockRoute} />);
 }
 
 describe('Step 1 validation', () => {
-  const validStellarKey = 'GBDT6FOHFRHVJYECWJVYFJX3W43YV5BFBXBZV6HE4BBXWHIZM7VNBWF';
+  const validStellarKey = 'GDNM7WSJ7VIUVK2TSZ2OQES5XR2663TZEIBFXRDT56B5IRLHERVWSXMU';
 
   interface Case {
     label: string;
@@ -108,7 +109,7 @@ describe('Step 1 validation', () => {
 });
 
 describe('Step 2 validation', () => {
-  const validStellarKey = 'GBDT6FOHFRHVJYECWJVYFJX3W43YV5BFBXBZV6HE4BBXWHIZM7VNBWF';
+  const validStellarKey = 'GDNM7WSJ7VIUVK2TSZ2OQES5XR2663TZEIBFXRDT56B5IRLHERVWSXMU';
 
   async function advanceToStep2(utils: ReturnType<typeof render>) {
     const { getByText, getByPlaceholderText } = utils;

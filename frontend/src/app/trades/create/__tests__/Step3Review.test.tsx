@@ -1,10 +1,12 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import Step3Review from '../steps/Step3Review';
 import { TradeProvider, useTrade, TradeData } from '../TradeContext';
+import { ToastProvider } from '@/hooks/useToast';
 import { api } from '@/lib/api';
 import { signTransaction } from '@stellar/freighter-api';
+import { _clearAllForTests } from '@/lib/actionDedup';
 
 // Mock @stellar/stellar-sdk to simplify address validation in tests
 jest.mock('@stellar/stellar-sdk', () => ({
@@ -27,6 +29,10 @@ const mockUseAuth = {
 // Mock the hooks and modules
 jest.mock('@/hooks/useAuth', () => ({
     useAuth: () => mockUseAuth,
+}));
+
+jest.mock('@/hooks/useOffline', () => ({
+    useOffline: () => ({ isOffline: false }),
 }));
 
 jest.mock('@radix-ui/react-dialog', () => {
@@ -82,16 +88,20 @@ const TestWrapper = ({ initialData, children }: { initialData?: Partial<TradeDat
 
 const renderWithProvider = (initialData?: Partial<TradeData>) => {
     return render(
-        <TradeProvider>
-            <TestWrapper initialData={initialData}>
-                <Step3Review />
-            </TestWrapper>
-        </TradeProvider>
+        <ToastProvider>
+            <TradeProvider>
+                <TestWrapper initialData={initialData}>
+                    <Step3Review />
+                </TestWrapper>
+            </TradeProvider>
+        </ToastProvider>
     );
 };
 
 describe('Step3Review', () => {
     beforeEach(() => {
+        window.localStorage.clear();
+        _clearAllForTests();
         mockUseAuth.token = 'mock-token';
         mockUseAuth.isAuthenticated = true;
         mockUseAuth.isWalletConnected = true;
@@ -109,6 +119,11 @@ describe('Step3Review', () => {
             }),
         } as unknown as Response);
         jest.clearAllMocks();
+    });
+
+    afterEach(() => {
+        cleanup();
+        window.localStorage.clear();
     });
 
     describe('summary display', () => {
@@ -214,7 +229,7 @@ describe('Step3Review', () => {
         it('should render submit button', () => {
             renderWithProvider();
 
-            const submitButton = screen.getByRole('button', { name: /lock funds & create trade/i });
+            const submitButton = screen.getByRole('button', { name: /lock funds and create trade/i });
             expect(submitButton).toBeInTheDocument();
         });
 
@@ -245,7 +260,7 @@ describe('Step3Review', () => {
             const user = userEvent.setup();
             renderWithProvider(validData);
 
-            const submitButton = screen.getByRole('button', { name: /lock funds & create trade/i });
+            const submitButton = screen.getByRole('button', { name: /lock funds and create trade/i });
             await user.click(submitButton);
 
             expect(screen.getByTestId('legal-disclaimer-modal')).toBeInTheDocument();
@@ -255,7 +270,7 @@ describe('Step3Review', () => {
             const user = userEvent.setup();
             renderWithProvider(validData);
 
-            await user.click(screen.getByRole('button', { name: /lock funds & create trade/i }));
+            await user.click(screen.getByRole('button', { name: /lock funds and create trade/i }));
             expect(screen.getByTestId('legal-disclaimer-modal')).toBeInTheDocument();
 
             await user.click(screen.getByRole('button', { name: /decline/i }));
@@ -278,7 +293,7 @@ describe('Step3Review', () => {
         it('should be enabled when authenticated', () => {
             renderWithProvider(validData);
 
-            const submitButton = screen.getByRole('button', { name: /lock funds & create trade/i });
+            const submitButton = screen.getByRole('button', { name: /lock funds and create trade/i });
             expect(submitButton).not.toBeDisabled();
         });
 
@@ -287,7 +302,7 @@ describe('Step3Review', () => {
             (api.trades.create as jest.Mock).mockReturnValue(new Promise(() => {}));
             renderWithProvider(validData);
 
-            await user.click(screen.getByRole('button', { name: /lock funds & create trade/i }));
+            await user.click(screen.getByRole('button', { name: /lock funds and create trade/i }));
             await user.click(screen.getByRole('button', { name: /accept/i }));
 
             expect(screen.getByText(/creating trade/i)).toBeInTheDocument();
@@ -298,7 +313,7 @@ describe('Step3Review', () => {
             (api.trades.create as jest.Mock).mockReturnValue(new Promise(() => {}));
             renderWithProvider(validData);
 
-            await user.click(screen.getByRole('button', { name: /lock funds & create trade/i }));
+            await user.click(screen.getByRole('button', { name: /lock funds and create trade/i }));
             await user.click(screen.getByRole('button', { name: /accept/i }));
 
             const loadingButton = screen.getByRole('button', { name: /creating trade/i });
@@ -322,7 +337,7 @@ describe('Step3Review', () => {
             const user = userEvent.setup();
             renderWithProvider(validData);
 
-            await user.click(screen.getByRole('button', { name: /lock funds & create trade/i }));
+            await user.click(screen.getByRole('button', { name: /lock funds and create trade/i }));
             await user.click(screen.getByRole('button', { name: /accept/i }));
 
             // Error would be displayed if submission fails
@@ -358,7 +373,7 @@ describe('Step3Review', () => {
             const user = userEvent.setup();
             renderWithProvider(validData);
 
-            await user.click(screen.getByRole('button', { name: /lock funds & create trade/i }));
+            await user.click(screen.getByRole('button', { name: /lock funds and create trade/i }));
             await user.click(screen.getByRole('button', { name: /accept/i }));
         });
 
@@ -366,7 +381,7 @@ describe('Step3Review', () => {
             const user = userEvent.setup();
             renderWithProvider(validData);
 
-            await user.click(screen.getByRole('button', { name: /lock funds & create trade/i }));
+            await user.click(screen.getByRole('button', { name: /lock funds and create trade/i }));
             await user.click(screen.getByRole('button', { name: /accept/i }));
         });
 
@@ -374,7 +389,7 @@ describe('Step3Review', () => {
             const user = userEvent.setup();
             renderWithProvider(validData);
 
-            await user.click(screen.getByRole('button', { name: /lock funds & create trade/i }));
+            await user.click(screen.getByRole('button', { name: /lock funds and create trade/i }));
             await user.click(screen.getByRole('button', { name: /accept/i }));
         });
 
@@ -382,7 +397,7 @@ describe('Step3Review', () => {
             const user = userEvent.setup();
             renderWithProvider(validData);
 
-            await user.click(screen.getByRole('button', { name: /lock funds & create trade/i }));
+            await user.click(screen.getByRole('button', { name: /lock funds and create trade/i }));
             await user.click(screen.getByRole('button', { name: /accept/i }));
         });
 
@@ -390,7 +405,7 @@ describe('Step3Review', () => {
             const user = userEvent.setup();
             renderWithProvider(validData);
 
-            await user.click(screen.getByRole('button', { name: /lock funds & create trade/i }));
+            await user.click(screen.getByRole('button', { name: /lock funds and create trade/i }));
             await user.click(screen.getByRole('button', { name: /accept/i }));
         });
     });
@@ -481,7 +496,7 @@ describe('Step3Review', () => {
         it('should prevent empty submission', async () => {
             renderWithProvider();
 
-            const submitButton = screen.getByRole('button', { name: /lock funds & create trade/i });
+            const submitButton = screen.getByRole('button', { name: /lock funds and create trade/i });
 
             // Button should be disabled when empty
             expect(submitButton).toBeDisabled();

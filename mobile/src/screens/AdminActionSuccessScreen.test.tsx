@@ -7,10 +7,13 @@
  *  - Navigation buttons are present and trigger correct navigation calls.
  *  - Accessibility attributes (accessibilityLabel, accessibilityRole) are present.
  */
-import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
+import type { StackScreenProps } from '@react-navigation/stack';
 import AdminActionSuccessScreen from './AdminActionSuccessScreen';
 import { useAdminActionHistoryStore } from '../stores/adminActionHistoryStore';
+import type { RootStackParamList } from '../types/navigation';
+
+type ScreenProps = StackScreenProps<RootStackParamList, 'AdminActionSuccess'>;
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -30,20 +33,26 @@ jest.mock('../stores/adminActionHistoryStore', () => ({
 
 const FIXED_TIMESTAMP = '2026-07-30T12:00:00.000Z';
 
-function buildNavigation(overrides?: Partial<{ navigate: jest.Mock; goBack: jest.Mock }>) {
+function buildNavigation(
+  overrides?: Partial<{ navigate: jest.Mock; goBack: jest.Mock }>,
+): ScreenProps['navigation'] {
   return {
     navigate: jest.fn(),
     goBack: jest.fn(),
     ...overrides,
-  };
+  } as unknown as ScreenProps['navigation'];
 }
 
 function buildRoute(
   actionType: 'Clawback' | 'Lock' | 'Terminate' = 'Clawback',
   streamId = 'stream-001',
   timestamp = FIXED_TIMESTAMP,
-) {
-  return { params: { actionType, streamId, timestamp } };
+): ScreenProps['route'] {
+  return {
+    key: 'AdminActionSuccess',
+    name: 'AdminActionSuccess',
+    params: { actionType, streamId, timestamp },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +62,7 @@ function buildRoute(
 describe('AdminActionSuccessScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (useAdminActionHistoryStore as jest.Mock).mockReturnValue({ history: [] });
+    (useAdminActionHistoryStore as unknown as jest.Mock).mockReturnValue({ history: [] });
   });
 
   // ── #85.1: Success state clearly shows the completed action ────────────
@@ -61,8 +70,8 @@ describe('AdminActionSuccessScreen', () => {
   it('displays the hero title and action badge for a Clawback action', () => {
     const { getByText } = render(
       <AdminActionSuccessScreen
-        navigation={buildNavigation() as any}
-        route={buildRoute('Clawback') as any}
+        navigation={buildNavigation()}
+        route={buildRoute('Clawback')}
       />,
     );
     expect(getByText('Action completed')).toBeTruthy();
@@ -73,8 +82,8 @@ describe('AdminActionSuccessScreen', () => {
   it('displays the hero title and action badge for a Lock action', () => {
     const { getByText } = render(
       <AdminActionSuccessScreen
-        navigation={buildNavigation() as any}
-        route={buildRoute('Lock') as any}
+        navigation={buildNavigation()}
+        route={buildRoute('Lock')}
       />,
     );
     expect(getByText('Action completed')).toBeTruthy();
@@ -84,8 +93,8 @@ describe('AdminActionSuccessScreen', () => {
   it('displays the hero title and action badge for a Terminate action', () => {
     const { getByText } = render(
       <AdminActionSuccessScreen
-        navigation={buildNavigation() as any}
-        route={buildRoute('Terminate') as any}
+        navigation={buildNavigation()}
+        route={buildRoute('Terminate')}
       />,
     );
     expect(getByText('Action completed')).toBeTruthy();
@@ -95,8 +104,8 @@ describe('AdminActionSuccessScreen', () => {
   it('shows the stream ID in the hero subtitle', () => {
     const { getByText } = render(
       <AdminActionSuccessScreen
-        navigation={buildNavigation() as any}
-        route={buildRoute('Clawback', 'stream-042') as any}
+        navigation={buildNavigation()}
+        route={buildRoute('Clawback', 'stream-042')}
       />,
     );
     // The subtitle contains both streamId and timestamp separated by ` · `
@@ -109,15 +118,15 @@ describe('AdminActionSuccessScreen', () => {
   it('shows "No previous actions" when history is empty', () => {
     const { getByText } = render(
       <AdminActionSuccessScreen
-        navigation={buildNavigation() as any}
-        route={buildRoute() as any}
+        navigation={buildNavigation()}
+        route={buildRoute()}
       />,
     );
     expect(getByText('No previous actions recorded.')).toBeTruthy();
   });
 
   it('renders history rows when the store has entries', () => {
-    (useAdminActionHistoryStore as jest.Mock).mockReturnValue({
+    (useAdminActionHistoryStore as unknown as jest.Mock).mockReturnValue({
       history: [
         { actionType: 'Clawback', streamId: 'stream-001', timestamp: FIXED_TIMESTAMP },
         { actionType: 'Lock', streamId: 'stream-002', timestamp: FIXED_TIMESTAMP },
@@ -126,8 +135,8 @@ describe('AdminActionSuccessScreen', () => {
 
     const { getAllByText } = render(
       <AdminActionSuccessScreen
-        navigation={buildNavigation() as any}
-        route={buildRoute() as any}
+        navigation={buildNavigation()}
+        route={buildRoute()}
       />,
     );
 
@@ -139,8 +148,8 @@ describe('AdminActionSuccessScreen', () => {
   it('section header for history is present', () => {
     const { getByText } = render(
       <AdminActionSuccessScreen
-        navigation={buildNavigation() as any}
-        route={buildRoute() as any}
+        navigation={buildNavigation()}
+        route={buildRoute()}
       />,
     );
     expect(getByText('Recent admin actions')).toBeTruthy();
@@ -152,8 +161,8 @@ describe('AdminActionSuccessScreen', () => {
     const navigate = jest.fn();
     const { getByText } = render(
       <AdminActionSuccessScreen
-        navigation={buildNavigation({ navigate }) as any}
-        route={buildRoute() as any}
+        navigation={buildNavigation({ navigate })}
+        route={buildRoute()}
       />,
     );
     fireEvent.press(getByText('Back to streams'));
@@ -164,8 +173,8 @@ describe('AdminActionSuccessScreen', () => {
     const navigate = jest.fn();
     const { getByText } = render(
       <AdminActionSuccessScreen
-        navigation={buildNavigation({ navigate }) as any}
-        route={buildRoute() as any}
+        navigation={buildNavigation({ navigate })}
+        route={buildRoute()}
       />,
     );
     fireEvent.press(getByText('Vault dashboard'));
@@ -177,8 +186,8 @@ describe('AdminActionSuccessScreen', () => {
   it('"Back to streams" button has accessibilityLabel set', () => {
     const { UNSAFE_queryByProps } = render(
       <AdminActionSuccessScreen
-        navigation={buildNavigation() as any}
-        route={buildRoute() as any}
+        navigation={buildNavigation()}
+        route={buildRoute()}
       />,
     );
     const btn = UNSAFE_queryByProps({ accessibilityLabel: 'Back to admin stream overview' });
@@ -188,8 +197,8 @@ describe('AdminActionSuccessScreen', () => {
   it('"Vault dashboard" button has accessibilityLabel set', () => {
     const { UNSAFE_queryByProps } = render(
       <AdminActionSuccessScreen
-        navigation={buildNavigation() as any}
-        route={buildRoute() as any}
+        navigation={buildNavigation()}
+        route={buildRoute()}
       />,
     );
     const btn = UNSAFE_queryByProps({ accessibilityLabel: 'Go to vault dashboard' });
@@ -199,8 +208,8 @@ describe('AdminActionSuccessScreen', () => {
   it('"Back to streams" button has an accessibilityHint', () => {
     const { UNSAFE_queryByProps } = render(
       <AdminActionSuccessScreen
-        navigation={buildNavigation() as any}
-        route={buildRoute() as any}
+        navigation={buildNavigation()}
+        route={buildRoute()}
       />,
     );
     const btn = UNSAFE_queryByProps({
@@ -212,8 +221,8 @@ describe('AdminActionSuccessScreen', () => {
   it('"Vault dashboard" button has an accessibilityHint', () => {
     const { UNSAFE_queryByProps } = render(
       <AdminActionSuccessScreen
-        navigation={buildNavigation() as any}
-        route={buildRoute() as any}
+        navigation={buildNavigation()}
+        route={buildRoute()}
       />,
     );
     const btn = UNSAFE_queryByProps({
@@ -225,11 +234,14 @@ describe('AdminActionSuccessScreen', () => {
   it('hero section has accessibilityRole="header"', () => {
     const { UNSAFE_queryByProps } = render(
       <AdminActionSuccessScreen
-        navigation={buildNavigation() as any}
-        route={buildRoute() as any}
+        navigation={buildNavigation()}
+        route={buildRoute()}
       />,
     );
-    const header = UNSAFE_queryByProps({ accessibilityRole: 'header' });
+    const header = UNSAFE_queryByProps({
+      accessibilityRole: 'header',
+      accessibilityLabel: 'Admin action completed successfully',
+    });
     expect(header).not.toBeNull();
   });
 });

@@ -1,4 +1,5 @@
 import React from "react";
+import type { ReactNode } from "react";
 import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 import SettingsPage from "../page";
 
@@ -18,9 +19,12 @@ const mockAuthBase = {
   isWalletConnected: true,
   isWalletDetected: true,
   isLoading: false,
+  shortAddress: "GABCDE...MNOPXYZ",
+  error: null,
   connectWallet: jest.fn(),
   authenticate: jest.fn(),
   logout: jest.fn(),
+  refreshAuth: jest.fn(),
 };
 
 // ── Mock API client ───────────────────────────────────────────────────────────
@@ -53,7 +57,10 @@ jest.mock("@/lib/api/webhooks", () => ({
 // ── Mock UI components not under test ─────────────────────────────────────────
 
 jest.mock("@/components/ui/ConfirmActionModal", () => ({
-  ConfirmActionModal: ({ open, onConfirm }: any) =>
+  ConfirmActionModal: ({
+    open,
+    onConfirm,
+  }: { open: boolean; onConfirm: () => void; children?: ReactNode }) =>
     open ? (
       <div data-testid="confirm-modal">
         <button onClick={onConfirm}>Confirm</button>
@@ -83,7 +90,7 @@ jest.mock("@/components/ThemeToggle", () => ({
 describe("Settings – Quiet Hours section", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedUseAuth.mockReturnValue(mockAuthBase as any);
+    mockedUseAuth.mockReturnValue(mockAuthBase as ReturnType<typeof useAuth>);
     mockedRequest.mockResolvedValue({ preferences: {} });
   });
 
@@ -190,7 +197,7 @@ describe("Settings – Quiet Hours section", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/saved/i)).toBeInTheDocument();
+      expect(screen.getByText("Saved", { exact: true })).toBeInTheDocument();
     });
   });
 

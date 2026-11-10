@@ -3,6 +3,14 @@ import userEvent from '@testing-library/user-event';
 import Step2Negotiation from '../steps/Step2Negotiation';
 import { TradeProvider } from '../TradeContext';
 
+beforeEach(() => {
+    window.localStorage.clear();
+});
+
+afterEach(() => {
+    window.localStorage.clear();
+});
+
 const renderWithProvider = () => {
     return render(
         <TradeProvider>

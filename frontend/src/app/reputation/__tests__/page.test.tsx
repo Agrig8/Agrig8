@@ -77,9 +77,12 @@ const authenticatedAuth = {
   address: "GABCDEFGHIJKLMNOPXYZ",
   isWalletConnected: true,
   isWalletDetected: true,
+  shortAddress: "GABCDE...MNOPXYZ",
+  error: null,
   connectWallet: jest.fn(),
   authenticate: jest.fn(),
   logout: jest.fn(),
+  refreshAuth: jest.fn(),
 };
 
 /** A full reputation response with trade history. */
@@ -116,7 +119,7 @@ const reputationEmpty = {
 describe("ReputationPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedUseAuth.mockReturnValue(authenticatedAuth as any);
+    mockedUseAuth.mockReturnValue(authenticatedAuth as ReturnType<typeof useAuth>);
   });
 
   // ── Empty state ────────────────────────────────────────────────────────────
@@ -275,7 +278,7 @@ describe("ReputationPage", () => {
         isAuthenticated: false,
         isLoading: false,
         token: null,
-      } as any);
+      } as ReturnType<typeof useAuth>);
 
       render(<ReputationPage />);
 

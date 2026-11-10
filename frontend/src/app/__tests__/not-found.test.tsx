@@ -1,9 +1,10 @@
 import { render, screen } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import NotFoundPage from "../not-found";
 
 jest.mock("next/link", () => ({
   __esModule: true,
-  default: ({ href, children, ...props }: any) => (
+  default: ({ href, children, ...props }: ComponentProps<"a">) => (
     <a href={href} {...props}>
       {children}
     </a>

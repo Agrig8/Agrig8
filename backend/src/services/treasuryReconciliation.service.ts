@@ -88,13 +88,13 @@ export class TreasuryReconciliationService {
 
     if (severity === "critical") {
       await alertService.dispatch(
-        "treasury_reconciliation_critical",
+        "reconciliation_drift_critical",
         `Treasury drift critical: ${driftBps} bps (${drift} stroops)`,
         { reportId, contractId, driftBps, drift: drift.toString() },
       );
     } else if (severity === "warning") {
       await alertService.dispatch(
-        "treasury_reconciliation_warning",
+        "reconciliation_drift_warning",
         `Treasury drift warning: ${driftBps} bps (${drift} stroops)`,
         { reportId, contractId, driftBps, drift: drift.toString() },
       );

@@ -121,12 +121,33 @@ async function freezePageDynamics(page: Page): Promise<void> {
     // Freeze date to a deterministic ISO timestamp.
     const FROZEN_DATE = new Date('2026-03-01T12:00:00.000Z').getTime();
     const OrigDate = window.Date;
+    type DateConstructorArgs =
+      | []
+      | [value: string | number]
+      | [
+          year: number,
+          monthIndex: number,
+          date?: number,
+          hours?: number,
+          minutes?: number,
+          seconds?: number,
+          milliseconds?: number,
+        ];
     class FrozenDate extends OrigDate {
-      constructor(...args: ConstructorParameters<typeof OrigDate>) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (args.length === 0) super(FROZEN_DATE as any);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        else super(...(args as [any]));
+      constructor(...args: DateConstructorArgs) {
+        if (args.length === 0) super(FROZEN_DATE);
+        else if (args.length === 1) super(args[0]);
+        else {
+          super(
+            args[0],
+            args[1],
+            args[2],
+            args[3],
+            args[4],
+            args[5],
+            args[6],
+          );
+        }
       }
       static now() { return FROZEN_DATE; }
     }
@@ -269,21 +290,21 @@ interface VisualFixtures {
 // ---------------------------------------------------------------------------
 
 export const test = base.extend<VisualFixtures>({
-  publicPage: async ({ page }, use) => {
+  publicPage: async ({ page }, provide) => {
     await freezePageDynamics(page);
     await mockApiRoutes(page);
-    await use(page);
+    await provide(page);
   },
 
-  authenticatedPage: async ({ page }, use) => {
+  authenticatedPage: async ({ page }, provide) => {
     const token = buildJwt(FIXTURES.walletAddress);
     await freezePageDynamics(page);
     await seedAuthenticatedWallet(page, FIXTURES.walletAddress, token);
     await mockApiRoutes(page);
-    await use(page);
+    await provide(page);
   },
 
-  adminPage: async ({ page }, use) => {
+  adminPage: async ({ page }, provide) => {
     const token = buildAdminJwt(FIXTURES.walletAddress);
     await freezePageDynamics(page);
     await seedAuthenticatedWallet(page, FIXTURES.walletAddress, token);
@@ -292,7 +313,7 @@ export const test = base.extend<VisualFixtures>({
     await page.addInitScript(() => {
       window.sessionStorage.setItem('amana_is_admin', 'true');
     });
-    await use(page);
+    await provide(page);
   },
 });
 

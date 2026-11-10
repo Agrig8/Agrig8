@@ -16,7 +16,7 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 // ─── Helper components that deliberately crash ────────────────────────────
 
-function CrashOnRender({ message }: { message: string }) {
+function CrashOnRender({ message }: { message: string }): never {
   throw new Error(message);
 }
 
@@ -35,7 +35,7 @@ function CrashAfterDelay({ message, delayMs }: { message: string; delayMs: numbe
   );
 }
 
-function CrashWithBackendId() {
+function CrashWithBackendId(): never {
   const fakeError = new Error("Simulated backend-originated error");
   // Attach a fake backend correlation ID so the boundary can pick it up
   (fakeError as unknown as Record<string, unknown>).backendError = {
@@ -98,8 +98,8 @@ export function ErrorBoundaryFixtures() {
         Error Boundary Fixtures
       </h2>
       <p className="text-text-muted text-xs mb-6">
-        Click "Trigger crash" inside each card to verify the branded fallback.
-        The "Try again" button resets the boundary — clicking it should restore
+        Click &quot;Trigger crash&quot; inside each card to verify the branded fallback.
+        The &quot;Try again&quot; button resets the boundary — clicking it should restore
         the fixture card.
       </p>
 
