@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/authStore';
 import { adminApi } from '../api/admin';
 import { AdminApiError } from '../api/errors';
 import { SigningError, submitAndConfirm } from '../services/adminSigning';
+import { createTestNavigation, createTestRoute } from '../test-utils/navigation';
 const mockSubmit = submitAndConfirm as jest.Mock;
 
 jest.mock('../stores/authStore', () => ({
@@ -44,19 +45,19 @@ const STELLAR_PUBKEY = 'G'.padEnd(56, 'A');
 describe('AdminContractScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (useAuthStore as jest.Mock).mockReturnValue({
-      role: 'admin',
+    (useAuthStore as unknown as jest.Mock).mockReturnValue({
+      isAdmin: true,
       clearAuth: jest.fn().mockResolvedValue(undefined),
     });
   });
 
   it('shows an access message for non-admin users', () => {
-    (useAuthStore as jest.Mock).mockReturnValue({ role: 'user' });
+    (useAuthStore as unknown as jest.Mock).mockReturnValue({ isAdmin: false });
     const navigation = { goBack: jest.fn(), navigate: jest.fn() };
     const { getByText } = render(
       <AdminContractScreen
-        navigation={navigation as any}
-        route={{} as any}
+        navigation={createTestNavigation<'AdminContract'>(navigation)}
+        route={createTestRoute('AdminContract', undefined)}
       />,
     );
     expect(getByText('Admin access required')).toBeTruthy();
@@ -70,8 +71,8 @@ describe('AdminContractScreen', () => {
     const navigation = { goBack: jest.fn(), navigate: jest.fn() };
     const { getByTestId, findByTestId } = render(
       <AdminContractScreen
-        navigation={navigation as any}
-        route={{} as any}
+        navigation={createTestNavigation<'AdminContract'>(navigation)}
+        route={createTestRoute('AdminContract', undefined)}
       />,
     );
 
@@ -99,8 +100,8 @@ describe('AdminContractScreen', () => {
     const navigation = { goBack: jest.fn(), navigate: jest.fn() };
     const { getByTestId, findByTestId } = render(
       <AdminContractScreen
-        navigation={navigation as any}
-        route={{} as any}
+        navigation={createTestNavigation<'AdminContract'>(navigation)}
+        route={createTestRoute('AdminContract', undefined)}
       />,
     );
 
@@ -122,7 +123,10 @@ describe('AdminContractScreen', () => {
       arrange();
       const nav = { goBack: jest.fn(), navigate: jest.fn() };
       const { getByTestId, findByTestId } = render(
-        <AdminContractScreen navigation={nav as any} route={{} as any} />,
+        <AdminContractScreen
+          navigation={createTestNavigation<'AdminContract'>(nav)}
+          route={createTestRoute('AdminContract', undefined)}
+        />,
       );
       fireEvent.changeText(getByTestId('admin-contract-add-input'), STELLAR_PUBKEY);
       await act(async () => {
@@ -141,7 +145,10 @@ describe('AdminContractScreen', () => {
     mockAddMediator.mockResolvedValue({ unsignedXdr: 'XDR' });
     const nav = { goBack: jest.fn(), navigate: jest.fn() };
     const { getByTestId, findByTestId } = render(
-      <AdminContractScreen navigation={nav as any} route={{} as any} />,
+      <AdminContractScreen
+        navigation={createTestNavigation<'AdminContract'>(nav)}
+        route={createTestRoute('AdminContract', undefined)}
+      />,
     );
     fireEvent.changeText(getByTestId('admin-contract-add-input'), STELLAR_PUBKEY);
     await act(async () => {

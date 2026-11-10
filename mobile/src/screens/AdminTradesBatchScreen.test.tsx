@@ -4,6 +4,7 @@ import AdminTradesBatchScreen from './AdminTradesBatchScreen';
 import { useAuthStore } from '../stores/authStore';
 import { adminApi } from '../api/admin';
 import { AdminApiError } from '../api/errors';
+import { createTestNavigation, createTestRoute } from '../test-utils/navigation';
 
 jest.mock('../stores/authStore', () => ({
   useAuthStore: jest.fn(),
@@ -38,19 +39,19 @@ const mockUpdate = adminApi.updateTradeStatusesBatch as jest.MockedFunction<
 describe('AdminTradesBatchScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (useAuthStore as jest.Mock).mockReturnValue({
-      role: 'admin',
+    (useAuthStore as unknown as jest.Mock).mockReturnValue({
+      isAdmin: true,
       clearAuth: jest.fn().mockResolvedValue(undefined),
     });
   });
 
   it('shows an access message for non-admin users', () => {
-    (useAuthStore as jest.Mock).mockReturnValue({ role: 'user' });
+    (useAuthStore as unknown as jest.Mock).mockReturnValue({ isAdmin: false });
     const navigation = { goBack: jest.fn(), navigate: jest.fn() };
     const { getByText } = render(
       <AdminTradesBatchScreen
-        navigation={navigation as any}
-        route={{} as any}
+        navigation={createTestNavigation<'AdminTradesBatch'>(navigation)}
+        route={createTestRoute('AdminTradesBatch', undefined)}
       />,
     );
     expect(getByText('Admin access required')).toBeTruthy();
@@ -65,8 +66,8 @@ describe('AdminTradesBatchScreen', () => {
     const navigation = { goBack: jest.fn(), navigate: jest.fn() };
     const { getByTestId, findByTestId } = render(
       <AdminTradesBatchScreen
-        navigation={navigation as any}
-        route={{} as any}
+        navigation={createTestNavigation<'AdminTradesBatch'>(navigation)}
+        route={createTestRoute('AdminTradesBatch', undefined)}
       />,
     );
 
@@ -103,8 +104,8 @@ describe('AdminTradesBatchScreen', () => {
     const navigation = { goBack: jest.fn(), navigate: jest.fn() };
     const { getByTestId, findByTestId } = render(
       <AdminTradesBatchScreen
-        navigation={navigation as any}
-        route={{} as any}
+        navigation={createTestNavigation<'AdminTradesBatch'>(navigation)}
+        route={createTestRoute('AdminTradesBatch', undefined)}
       />,
     );
 

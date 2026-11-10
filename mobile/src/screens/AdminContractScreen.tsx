@@ -117,8 +117,7 @@ function SignPanel({ unsignedXdr, testID }: { unsignedXdr: string; testID: strin
  */
 export default function AdminContractScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { role, clearAuth } = useAuthStore();
-  const isAdmin = role === 'admin';
+  const { isAdmin, clearAuth } = useAuthStore();
 
   // Mediators section.
   const [mediatorInput, setMediatorInput] = useState('');

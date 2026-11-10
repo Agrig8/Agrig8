@@ -4,12 +4,12 @@
  * navigation to trade detail on row press.
  */
 
-import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import TradeListScreen from '../TradeListScreen';
 import { useTradeStore } from '../../stores/tradeStore';
 import { useAuthStore } from '../../stores/authStore';
 import type { Trade } from '../../types/trade';
+import { createTestNavigation, createTestRoute } from '../../test-utils/navigation';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -22,14 +22,14 @@ jest.mock('../../stores/authStore');
 
 jest.mock('../../components/AdminErrorBanner', () => ({
   AdminErrorBanner: ({ view }: { view: { title: string } }) => {
-    const { Text } = require('react-native');
+    const { Text } = jest.requireActual('react-native') as typeof import('react-native');
     return <Text>{view.title}</Text>;
   },
 }));
 
 const mockNavigate = jest.fn();
 const mockReplace = jest.fn();
-const mockNavigation = {
+const mockNavigation = createTestNavigation<'TradeList'>({
   navigate: mockNavigate,
   replace: mockReplace,
   goBack: jest.fn(),
@@ -43,9 +43,9 @@ const mockNavigation = {
   getParent: jest.fn(),
   getState: jest.fn(),
   setParams: jest.fn(),
-} as any;
+});
 
-const mockRoute = { key: 'TradeList', name: 'TradeList', params: undefined } as any;
+const mockRoute = createTestRoute('TradeList', undefined);
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ describe('Loading state', () => {
     const { UNSAFE_getByType } = render(
       <TradeListScreen navigation={mockNavigation} route={mockRoute} />,
     );
-    const { ActivityIndicator } = require('react-native');
+    const { ActivityIndicator } = jest.requireActual('react-native') as typeof import('react-native');
     expect(UNSAFE_getByType(ActivityIndicator)).toBeTruthy();
   });
 });
@@ -114,23 +114,23 @@ describe('Loaded state', () => {
     setupStore({
       trades: [makeTrade(1, 'PENDING'), makeTrade(2, 'IN_TRANSIT'), makeTrade(3, 'COMPLETED')],
     });
-    const { getByText, getAllByText } = render(
+    const { getAllByText } = render(
       <TradeListScreen navigation={mockNavigation} route={mockRoute} />,
     );
     await waitFor(() => {
-      expect(getByText('Pending')).toBeTruthy();
-      expect(getByText('In Transit')).toBeTruthy();
-      expect(getByText('Completed')).toBeTruthy();
+      expect(getAllByText('Pending').length).toBeGreaterThan(0);
+      expect(getAllByText('In Transit').length).toBeGreaterThan(0);
+      expect(getAllByText('Completed').length).toBeGreaterThan(0);
     });
   });
 
   it('renders the correct trade IDs', async () => {
     setupStore({ trades: [makeTrade(1), makeTrade(2)] });
-    const { getByText } = render(
+    const { getAllByText } = render(
       <TradeListScreen navigation={mockNavigation} route={mockRoute} />,
     );
     await waitFor(() => {
-      expect(getByText('#trade-00')).toBeTruthy();
+      expect(getAllByText('#trade-00')).toHaveLength(2);
     });
   });
 });
@@ -161,7 +161,7 @@ describe('Pull-to-refresh', () => {
       <TradeListScreen navigation={mockNavigation} route={mockRoute} />,
     );
     await waitFor(() => {
-      const { FlatList } = require('react-native');
+      const { FlatList } = jest.requireActual('react-native') as typeof import('react-native');
       const list = UNSAFE_getByType(FlatList);
       act(() => {
         list.props.refreshControl.props.onRefresh();

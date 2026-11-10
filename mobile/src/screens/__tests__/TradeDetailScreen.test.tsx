@@ -4,13 +4,13 @@
  * not-found / forbidden states.
  */
 
-import React from 'react';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import TradeDetailScreen from '../TradeDetailScreen';
 import { useTradeStore } from '../../stores/tradeStore';
 import { useAuthStore } from '../../stores/authStore';
 import { tradeApi } from '../../api/trade';
 import type { Trade } from '../../types/trade';
+import { createTestNavigation, createTestRoute } from '../../test-utils/navigation';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -38,7 +38,7 @@ jest.mock('../../services/offline.service', () => ({
 }));
 jest.mock('../../components/AdminErrorBanner', () => ({
   AdminErrorBanner: ({ view, onGoBack }: { view: { title: string }; onGoBack?: () => void }) => {
-    const { Text, TouchableOpacity } = require('react-native');
+    const { Text, TouchableOpacity } = jest.requireActual('react-native') as typeof import('react-native');
     return (
       <>
         <Text>{view.title}</Text>
@@ -50,7 +50,7 @@ jest.mock('../../components/AdminErrorBanner', () => ({
 
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
-const mockNavigation = {
+const mockNavigation = createTestNavigation<'TradeDetail'>({
   navigate: mockNavigate,
   goBack: mockGoBack,
   dispatch: jest.fn(),
@@ -64,10 +64,10 @@ const mockNavigation = {
   getState: jest.fn(),
   setParams: jest.fn(),
   replace: jest.fn(),
-} as any;
+});
 
 function makeRoute(tradeId: string) {
-  return { key: 'TradeDetail', name: 'TradeDetail', params: { tradeId } } as any;
+  return createTestRoute('TradeDetail', { tradeId });
 }
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -126,7 +126,7 @@ describe('Loading state', () => {
     const { UNSAFE_getByType } = render(
       <TradeDetailScreen navigation={mockNavigation} route={makeRoute('trade-abc-001')} />,
     );
-    const { ActivityIndicator } = require('react-native');
+    const { ActivityIndicator } = jest.requireActual('react-native') as typeof import('react-native');
     expect(UNSAFE_getByType(ActivityIndicator)).toBeTruthy();
   });
 });
@@ -184,11 +184,11 @@ describe('PENDING status', () => {
 describe('FUNDED status', () => {
   it('shows Confirm Delivery and Initiate Dispute actions', async () => {
     setupStore(makeTrade({ status: 'FUNDED' }));
-    const { getByText } = render(
+    const { getByText, getAllByText } = render(
       <TradeDetailScreen navigation={mockNavigation} route={makeRoute('trade-abc-001')} />,
     );
     await waitFor(() => {
-      expect(getByText('Funded')).toBeTruthy();
+      expect(getAllByText('Funded').length).toBeGreaterThan(0);
       expect(getByText('✅ Confirm Delivery')).toBeTruthy();
       expect(getByText('⚠️ Initiate Dispute')).toBeTruthy();
     });
@@ -198,11 +198,11 @@ describe('FUNDED status', () => {
 describe('IN_TRANSIT status', () => {
   it('shows Confirm Delivery and Initiate Dispute actions', async () => {
     setupStore(makeTrade({ status: 'IN_TRANSIT' }));
-    const { getByText } = render(
+    const { getByText, getAllByText } = render(
       <TradeDetailScreen navigation={mockNavigation} route={makeRoute('trade-abc-001')} />,
     );
     await waitFor(() => {
-      expect(getByText('In Transit')).toBeTruthy();
+      expect(getAllByText('In Transit').length).toBeGreaterThan(0);
       expect(getByText('✅ Confirm Delivery')).toBeTruthy();
       expect(getByText('⚠️ Initiate Dispute')).toBeTruthy();
     });
@@ -212,11 +212,11 @@ describe('IN_TRANSIT status', () => {
 describe('DELIVERED status', () => {
   it('shows Release Funds and Initiate Dispute actions', async () => {
     setupStore(makeTrade({ status: 'DELIVERED' }));
-    const { getByText } = render(
+    const { getByText, getAllByText } = render(
       <TradeDetailScreen navigation={mockNavigation} route={makeRoute('trade-abc-001')} />,
     );
     await waitFor(() => {
-      expect(getByText('Delivered')).toBeTruthy();
+      expect(getAllByText('Delivered').length).toBeGreaterThan(0);
       expect(getByText('💸 Release Funds')).toBeTruthy();
       expect(getByText('⚠️ Initiate Dispute')).toBeTruthy();
     });
@@ -226,11 +226,11 @@ describe('DELIVERED status', () => {
 describe('DISPUTED status', () => {
   it('shows Upload Evidence action', async () => {
     setupStore(makeTrade({ status: 'DISPUTED' }));
-    const { getByText } = render(
+    const { getByText, getAllByText } = render(
       <TradeDetailScreen navigation={mockNavigation} route={makeRoute('trade-abc-001')} />,
     );
     await waitFor(() => {
-      expect(getByText('Disputed')).toBeTruthy();
+      expect(getAllByText('Disputed').length).toBeGreaterThan(0);
       expect(getByText('📹 Upload Evidence')).toBeTruthy();
     });
   });
@@ -249,11 +249,11 @@ describe('DISPUTED status', () => {
 describe('COMPLETED status', () => {
   it('shows no action buttons and fallback text', async () => {
     setupStore(makeTrade({ status: 'COMPLETED' }));
-    const { getByText, queryByText } = render(
+    const { getByText, getAllByText, queryByText } = render(
       <TradeDetailScreen navigation={mockNavigation} route={makeRoute('trade-abc-001')} />,
     );
     await waitFor(() => {
-      expect(getByText('Completed')).toBeTruthy();
+      expect(getAllByText('Completed').length).toBeGreaterThan(0);
       expect(getByText('No actions available for this trade status.')).toBeTruthy();
       expect(queryByText('💰 Deposit Funds')).toBeNull();
     });
@@ -263,11 +263,11 @@ describe('COMPLETED status', () => {
 describe('REFUNDED status', () => {
   it('shows no action buttons and fallback text', async () => {
     setupStore(makeTrade({ status: 'REFUNDED' }));
-    const { getByText } = render(
+    const { getByText, getAllByText } = render(
       <TradeDetailScreen navigation={mockNavigation} route={makeRoute('trade-abc-001')} />,
     );
     await waitFor(() => {
-      expect(getByText('Refunded')).toBeTruthy();
+      expect(getAllByText('Refunded').length).toBeGreaterThan(0);
       expect(getByText('No actions available for this trade status.')).toBeTruthy();
     });
   });

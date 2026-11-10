@@ -28,16 +28,18 @@ function NotificationItem({
   theme: ReturnType<typeof getTheme>;
 }) {
   return (
-    <TouchableOpacity
+    <View
       style={[
         styles.item,
         { backgroundColor: item.isRead ? theme.surface : theme.unreadBg, borderBottomColor: theme.border },
       ]}
-      onPress={() => onPress(item)}
-      accessibilityRole="button"
-      accessibilityLabel={item.title}
     >
-      <View style={styles.itemContent}>
+      <TouchableOpacity
+        style={styles.itemContent}
+        onPress={() => onPress(item)}
+        accessibilityRole="button"
+        accessibilityLabel={item.title}
+      >
         {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />}
         <View style={styles.itemText}>
           <Text style={[styles.title, { color: theme.textPrimary }, !item.isRead && styles.titleUnread]}>
@@ -50,7 +52,7 @@ function NotificationItem({
             {new Date(item.createdAt).toLocaleString()}
           </Text>
         </View>
-      </View>
+      </TouchableOpacity>
       {!item.isRead && (
         <TouchableOpacity
           style={[styles.readBtn, { borderColor: theme.primary }]}
@@ -60,7 +62,7 @@ function NotificationItem({
           <Text style={[styles.readBtnText, { color: theme.primary }]}>Mark read</Text>
         </TouchableOpacity>
       )}
-    </TouchableOpacity>
+    </View>
   );
 }
 

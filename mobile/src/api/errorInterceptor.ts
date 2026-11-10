@@ -34,10 +34,14 @@ export const UNKNOWN_ERROR_CODE = 'UNKNOWN';
  *  - Anything else → generic `INTERNAL_ERROR` mapping.
  */
 export function adminErrorResponseErrorInterceptor(
-  error: AxiosError<RawBackendErrorBody>,
+  error: AxiosError<unknown>,
 ): Promise<never> {
   const status = error.response?.status;
-  const body: RawBackendErrorBody | undefined = error.response?.data;
+  const data = error.response?.data;
+  const body: RawBackendErrorBody | undefined =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? (data as RawBackendErrorBody)
+      : undefined;
   const fallback = error.message || 'Request failed';
 
   // --- Network / timeout (no response) ---
@@ -250,7 +254,7 @@ export function attachRefreshTokenInterceptor(
 
     return runRefresh()
       .then(() => instance.request(config))
-      .catch((refreshError: unknown) => {
+      .catch(() => {
         handlers.logout();
         return adminErrorResponseErrorInterceptor(error);
       });

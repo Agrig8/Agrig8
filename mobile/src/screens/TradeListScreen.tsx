@@ -365,8 +365,6 @@ export default function TradeListScreen({ navigation }: Props) {
           renderItem={({ item }) => (
             <TradeCard
               trade={item}
-              onPress={() => navigation.navigate('TradeDetail', { tradeId: item.tradeId })}
-              onLongPress={() => void copyTradeId(item.tradeId)}
               selected={isTwoColumn && item.tradeId === effectiveSelectedId}
               onLongPress={() => void copyTradeId(item.tradeId)}
               onPress={() => openTrade(item.tradeId)}

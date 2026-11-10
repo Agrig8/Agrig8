@@ -4,6 +4,7 @@ import AdminFeaturesScreen from './AdminFeaturesScreen';
 import { useAuthStore } from '../stores/authStore';
 import { adminApi } from '../api/admin';
 import { AdminApiError } from '../api/errors';
+import { createTestNavigation, createTestRoute } from '../test-utils/navigation';
 
 jest.mock('../stores/authStore', () => ({
   useAuthStore: jest.fn(),
@@ -34,19 +35,19 @@ const mockSet = adminApi.setFeatureFlag as jest.MockedFunction<
 describe('AdminFeaturesScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (useAuthStore as jest.Mock).mockReturnValue({
-      role: 'admin',
+    (useAuthStore as unknown as jest.Mock).mockReturnValue({
+      isAdmin: true,
       clearAuth: jest.fn().mockResolvedValue(undefined),
     });
   });
 
   it('shows an access message for non-admin users', () => {
-    (useAuthStore as jest.Mock).mockReturnValue({ role: 'user' });
+    (useAuthStore as unknown as jest.Mock).mockReturnValue({ isAdmin: false });
     const navigation = { goBack: jest.fn(), navigate: jest.fn() };
     const { getByText } = render(
       <AdminFeaturesScreen
-        navigation={navigation as any}
-        route={{} as any}
+        navigation={createTestNavigation<'AdminFeatures'>(navigation)}
+        route={createTestRoute('AdminFeatures', undefined)}
       />,
     );
     expect(getByText('Admin access required')).toBeTruthy();
@@ -63,8 +64,8 @@ describe('AdminFeaturesScreen', () => {
     const navigation = { goBack: jest.fn(), navigate: jest.fn() };
     const { findByTestId } = render(
       <AdminFeaturesScreen
-        navigation={navigation as any}
-        route={{} as any}
+        navigation={createTestNavigation<'AdminFeatures'>(navigation)}
+        route={createTestRoute('AdminFeatures', undefined)}
       />,
     );
 
@@ -90,8 +91,8 @@ describe('AdminFeaturesScreen', () => {
     const navigation = { goBack: jest.fn(), navigate: jest.fn() };
     const { findByTestId } = render(
       <AdminFeaturesScreen
-        navigation={navigation as any}
-        route={{} as any}
+        navigation={createTestNavigation<'AdminFeatures'>(navigation)}
+        route={createTestRoute('AdminFeatures', undefined)}
       />,
     );
 

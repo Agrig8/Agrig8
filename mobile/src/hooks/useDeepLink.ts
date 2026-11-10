@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { NavigationContainerRef } from '@react-navigation/native';
+import { CommonActions, type NavigationContainerRef } from '@react-navigation/native';
 import type { RootStackParamList } from '../types/navigation';
 import { useAuthStore } from '../stores/authStore';
 import {
@@ -45,7 +45,9 @@ function navigate(
   target: DeepLinkTarget,
 ): void {
   if (!navigation) return;
-  navigation.navigate(target.screen as never, (target.params ?? undefined) as never);
+  navigation.dispatch(
+    CommonActions.navigate({ name: target.screen, params: target.params }),
+  );
 }
 
 export function useDeepLink(): UseDeepLinkReturn {

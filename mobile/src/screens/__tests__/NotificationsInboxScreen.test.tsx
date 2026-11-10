@@ -3,9 +3,10 @@
  * Covers list rendering, unread styling, mark-as-read, and deep-link navigation.
  */
 
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { act, render, fireEvent, waitFor } from '@testing-library/react-native';
 import NotificationsInboxScreen from '../NotificationsInboxScreen';
 import { notificationsApi } from '../../api/notifications';
+import { createTestNavigation, createTestRoute } from '../../test-utils/navigation';
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -21,7 +22,7 @@ jest.mock('../../api/notifications', () => ({
 
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
-const mockNavigation = {
+const mockNavigation = createTestNavigation<'NotificationsInbox'>({
   navigate: mockNavigate,
   goBack: mockGoBack,
   dispatch: jest.fn(),
@@ -35,9 +36,9 @@ const mockNavigation = {
   getState: jest.fn(),
   setParams: jest.fn(),
   replace: jest.fn(),
-} as any;
+});
 
-const mockRoute = { key: 'NotificationsInbox', name: 'NotificationsInbox', params: undefined } as any;
+const mockRoute = createTestRoute('NotificationsInbox', undefined);
 
 const mockList = notificationsApi.listNotifications as jest.MockedFunction<typeof notificationsApi.listNotifications>;
 const mockMarkRead = notificationsApi.markRead as jest.MockedFunction<typeof notificationsApi.markRead>;
@@ -69,9 +70,11 @@ test('renders empty state when no notifications', async () => {
   const { getByText } = render(
     <NotificationsInboxScreen navigation={mockNavigation} route={mockRoute} />,
   );
-  await waitFor(() => {
-    expect(getByText('No notifications yet')).toBeTruthy();
+  await waitFor(() => expect(mockList).toHaveBeenCalled());
+  await act(async () => {
+    await mockList.mock.results[0].value;
   });
+  expect(getByText('No notifications yet')).toBeTruthy();
 });
 
 test('renders notification list', async () => {
@@ -106,15 +109,16 @@ test('tapping mark-read calls API and updates item', async () => {
     notifications: [makeNotification(1, false)],
     pagination: { page: 1, limit: 20, total: 1, totalPages: 1, unreadCount: 1 },
   });
-  const { getByText, queryByText } = render(
+  const { getByLabelText, queryByText } = render(
     <NotificationsInboxScreen navigation={mockNavigation} route={mockRoute} />,
   );
-  await waitFor(() => getByText('Mark read'));
-  fireEvent.press(getByText('Mark read'));
-  await waitFor(() => {
-    expect(mockMarkRead).toHaveBeenCalledWith(1);
-    expect(queryByText('Mark read')).toBeNull();
+  await waitFor(() => getByLabelText('Mark as read'));
+  await act(async () => {
+    fireEvent.press(getByLabelText('Mark as read'));
+    await Promise.resolve();
   });
+  expect(mockMarkRead).toHaveBeenCalledWith(1);
+  expect(queryByText('Mark read')).toBeNull();
 });
 
 test('tapping notification with tradeId navigates to TradeDetail', async () => {
@@ -139,9 +143,10 @@ test('mark all read button calls API and clears unread', async () => {
     <NotificationsInboxScreen navigation={mockNavigation} route={mockRoute} />,
   );
   await waitFor(() => getByText('Mark all read'));
-  fireEvent.press(getByText('Mark all read'));
-  await waitFor(() => {
-    expect(mockMarkAllRead).toHaveBeenCalled();
-    expect(queryByText('Mark all read')).toBeNull();
+  await act(async () => {
+    fireEvent.press(getByText('Mark all read'));
+    await Promise.resolve();
   });
+  expect(mockMarkAllRead).toHaveBeenCalled();
+  expect(queryByText('Mark all read')).toBeNull();
 });

@@ -1,5 +1,5 @@
 ﻿import { lazy, Suspense, useEffect, useMemo, useRef } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { getStateFromPath, NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import type { LinkingOptions, NavigationContainerRef } from '@react-navigation/native';
 import { ActivityIndicator, Linking, View } from 'react-native';
@@ -65,8 +65,7 @@ const Stack = createStackNavigator<RootStackParamList>();
 function makeLinking(isAuthenticated: boolean): LinkingOptions<RootStackParamList> {
   return {
     prefixes: LINK_PREFIXES,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    config: { screens: LINKING_SCREEN_CONFIG as any },
+    config: { screens: LINKING_SCREEN_CONFIG },
     getStateFromPath: (path, options) => {
       const target = parseDeepLink(path);
       if (target && requiresAuth(target) && !isAuthenticated) {
@@ -74,9 +73,7 @@ function makeLinking(isAuthenticated: boolean): LinkingOptions<RootStackParamLis
         // resumes it once a token appears (login-then-continue).
         return { routes: [{ name: 'WalletConnect' }] };
       }
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const nav = require('@react-navigation/native');
-      return nav.getStateFromPath(path, options);
+      return getStateFromPath(path, options);
     },
   };
 }

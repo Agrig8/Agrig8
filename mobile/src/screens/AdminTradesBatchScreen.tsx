@@ -39,8 +39,7 @@ type Props = StackScreenProps<RootStackParamList, 'AdminTradesBatch'>;
  */
 export default function AdminTradesBatchScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { role, clearAuth } = useAuthStore();
-  const isAdmin = role === 'admin';
+  const { isAdmin, clearAuth } = useAuthStore();
 
   const [tradeIdsText, setTradeIdsText] = useState('');
   const [status, setStatus] = useState<TradeStatus>('CANCELLED');

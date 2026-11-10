@@ -5,7 +5,7 @@ import * as authStore from '../stores/authStore';
 jest.mock('../stores/authStore', () => ({ useAuthStore: jest.fn() }));
 
 const setAuth = (token: string | null) =>
-  (authStore.useAuthStore as jest.Mock).mockReturnValue({ token });
+  (authStore.useAuthStore as unknown as jest.Mock).mockReturnValue({ token });
 
 describe('useDeepLink (auth-aware routing)', () => {
   beforeEach(() => {
@@ -15,29 +15,29 @@ describe('useDeepLink (auth-aware routing)', () => {
 
   it('navigates immediately when authenticated (warm start)', () => {
     setAuth('tok');
-    const nav = { navigate: jest.fn() } as never;
+    const nav = { dispatch: jest.fn() } as never;
     const { result } = renderHook(() => useDeepLink());
 
     act(() => {
       result.current.handleUrl('https://amanavault.app/trades/T1', nav);
     });
 
-    expect((nav as unknown as { navigate: jest.Mock }).navigate).toHaveBeenCalledWith('TradeDetail', {
-      tradeId: 'T1',
-    });
+    expect((nav as unknown as { dispatch: jest.Mock }).dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'NAVIGATE', payload: { name: 'TradeDetail', params: { tradeId: 'T1' } } }),
+    );
     expect(result.current.pendingDeepLink).toBeNull();
   });
 
   it('parks a link that needs auth while signed out, then resumes after login', () => {
     setAuth(null);
-    const nav = { navigate: jest.fn() } as never;
+    const nav = { dispatch: jest.fn() } as never;
     const { result, rerender } = renderHook(() => useDeepLink());
 
     act(() => {
       result.current.handleUrl('amanavault://trades/T-789', nav);
     });
 
-    expect((nav as unknown as { navigate: jest.Mock }).navigate).not.toHaveBeenCalled();
+    expect((nav as unknown as { dispatch: jest.Mock }).dispatch).not.toHaveBeenCalled();
     expect(result.current.pendingDeepLink).toEqual({
       screen: 'TradeDetail',
       params: { tradeId: 'T-789' },
@@ -45,15 +45,15 @@ describe('useDeepLink (auth-aware routing)', () => {
 
     // user logs in
     setAuth('tok');
-    rerender();
+    rerender(undefined);
 
     act(() => {
       result.current.resumePendingDeepLink(nav);
     });
 
-    expect((nav as unknown as { navigate: jest.Mock }).navigate).toHaveBeenCalledWith('TradeDetail', {
-      tradeId: 'T-789',
-    });
+    expect((nav as unknown as { dispatch: jest.Mock }).dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'NAVIGATE', payload: { name: 'TradeDetail', params: { tradeId: 'T-789' } } }),
+    );
     expect(result.current.pendingDeepLink).toBeNull();
   });
 

@@ -2,6 +2,7 @@
 import { tradeApi } from '../trade';
 
 jest.mock('../client', () => ({
+  __esModule: true,
   default: {
     get: jest.fn(),
     post: jest.fn(),
