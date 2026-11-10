@@ -64,7 +64,7 @@ jobs:
         env:
           NODE_ENV: test
           JWT_SECRET: test-jwt-secret-value-with-minimum-length-32
-        run: pnpm test -- --forceExit --detectOpenHandles
+        run: pnpm test --forceExit --detectOpenHandles
 
       # ── Contract Unit Tests ─────────────────────────────────────────────
       - name: Run contract tests
@@ -94,8 +94,8 @@ jobs:
           echo ""
 
           # Run the lifecycle integration tests
-          pnpm test -- --forceExit --detectOpenHandles \
-            --testPathPattern='e2e.*lifecycle|lifecycle.*e2e' \
+          pnpm test --forceExit --detectOpenHandles \
+            --testPathPatterns='e2e.*lifecycle|lifecycle.*e2e' \
             --verbose 2>&1 | tee /tmp/e2e-output.log
 
           EXIT_CODE=$?
