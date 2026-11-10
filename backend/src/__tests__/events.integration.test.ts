@@ -1,20 +1,4 @@
-/**
- * Integration tests for Soroban contract event emission and backend consumption.
- *
- * These tests verify:
- * - Event format/content matches between contract emissions and backend expectations
- * - All 7+ event types are properly emitted and consumed
- * - Event field names match backend event handler expectations
- * - Event values (amounts, addresses) are correctly serialized
- * - Event order matches transaction order (no out-of-order events)
- * - No events lost or duplicated in high-throughput scenarios
- */
-
-/* ------------------------------------------------------------------ */
-/*  Mock Setup                                                        */
-/* ------------------------------------------------------------------ */
-
-const mockScValToNative = jest.fn();
+const mockScValToNative = jest.fn((value: unknown) => value);
 
 jest.mock("@stellar/stellar-sdk", () => ({
   rpc: {
@@ -22,7 +6,7 @@ jest.mock("@stellar/stellar-sdk", () => ({
       getEvents: jest.fn(),
     })),
   },
-  scValToNative: (...args: unknown[]) => mockScValToNative(...args),
+  scValToNative: (value: unknown) => mockScValToNative(value),
 }));
 
 jest.mock("../config/eventListener.config", () => ({
@@ -37,948 +21,318 @@ jest.mock("../config/eventListener.config", () => ({
   }),
 }));
 
-/* Import after mocks are set up */
+jest.mock("../services/trade.watchlist.service", () => ({
+  TradeWatchlistService: jest.fn().mockImplementation(() => ({
+    notifyWatchers: jest.fn().mockResolvedValue(undefined),
+  })),
+}));
+
+jest.mock("../services/webhook.service", () => ({
+  webhookService: { dispatch: jest.fn() },
+}));
+
+jest.mock("../lib/escrowAudit", () => ({ logEscrowEvent: jest.fn() }));
+jest.mock("../lib/metrics", () => ({
+  recordTradeFunnelEvent: jest.fn(),
+  recordTimeToFund: jest.fn(),
+  recordTimeToRelease: jest.fn(),
+  recordTradeGmv: jest.fn(),
+}));
+
 import { EventListenerService } from "../services/eventListener.service";
-import { EventType, EVENT_TO_STATUS } from "../types/events";
+import { EventType, EVENT_TO_STATUS, TradeStatus } from "../types/events";
 
-/* ------------------------------------------------------------------ */
-/*  Test Utilities                                                    */
-/* ------------------------------------------------------------------ */
+type TradeRow = {
+  tradeId: string;
+  buyerAddress: string;
+  sellerAddress: string;
+  amountUsdc: string;
+  status: TradeStatus;
+  version: number;
+};
 
-/**
- * Creates a mock PrismaClient with spyable methods.
- */
 function createMockPrisma() {
-  const mockTrade = {
-    upsert: jest.fn().mockResolvedValue({}),
-    create: jest.fn().mockResolvedValue({}),
-    findUnique: jest.fn().mockResolvedValue(null),
-    findMany: jest.fn().mockResolvedValue([]),
-    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+  const trades = new Map<string, TradeRow>();
+  const processedEvents = new Set<string>();
+
+  const trade = {
+    findUnique: jest.fn(async ({ where }: { where: { tradeId: string } }) =>
+      trades.get(where.tradeId) ?? null,
+    ),
+    create: jest.fn(async ({ data }: { data: TradeRow }) => {
+      trades.set(data.tradeId, { ...data });
+      return data;
+    }),
+    updateMany: jest.fn(
+      async ({
+        where,
+        data,
+      }: {
+        where: { tradeId: string; status: TradeStatus; version: number };
+        data: { status: TradeStatus; version: { increment: number } };
+      }) => {
+        const current = trades.get(where.tradeId);
+        if (
+          !current ||
+          current.status !== where.status ||
+          current.version !== where.version
+        ) {
+          return { count: 0 };
+        }
+
+        trades.set(where.tradeId, {
+          ...current,
+          status: data.status,
+          version: current.version + data.version.increment,
+        });
+        return { count: 1 };
+      },
+    ),
   };
 
-  const mockProcessedLedger = {
-    upsert: jest.fn().mockResolvedValue({}),
-    findMany: jest.fn().mockResolvedValue([]),
-    create: jest.fn().mockResolvedValue({}),
+  const processedEvent = {
+    findUnique: jest.fn(
+      async ({
+        where,
+      }: {
+        where: {
+          ledgerSequence_contractId_eventId: {
+            ledgerSequence: number;
+            contractId: string;
+            eventId: string;
+          };
+        };
+      }) => {
+        const key = where.ledgerSequence_contractId_eventId;
+        return processedEvents.has(
+          `${key.ledgerSequence}:${key.contractId}:${key.eventId}`,
+        )
+          ? { id: 1 }
+          : null;
+      },
+    ),
+    create: jest.fn(
+      async ({
+        data,
+      }: {
+        data: {
+          ledgerSequence: number;
+          contractId: string;
+          eventId: string;
+        };
+      }) => {
+        processedEvents.add(
+          `${data.ledgerSequence}:${data.contractId}:${data.eventId}`,
+        );
+        return data;
+      },
+    ),
   };
 
-  const mockProcessedEvent = {
-    findUnique: jest.fn().mockResolvedValue(null),
-    create: jest.fn().mockResolvedValue({}),
-    upsert: jest.fn().mockResolvedValue({}),
+  const streamClawbackEvent = {
+    upsert: jest.fn().mockResolvedValue(undefined),
   };
 
-  const mockObj = {
-    trade: mockTrade,
-    processedLedger: mockProcessedLedger,
-    processedEvent: mockProcessedEvent,
-    $transaction: jest.fn().mockImplementation(async (fn: (tx: any) => Promise<any>) => fn({
-      trade: mockTrade,
-      processedLedger: mockProcessedLedger,
-      processedEvent: mockProcessedEvent,
-    })),
-    $connect: jest.fn().mockResolvedValue(undefined),
-    $disconnect: jest.fn().mockResolvedValue(undefined),
-  } as any;
+  const prisma: any = {
+    trade,
+    processedEvent,
+    streamClawbackEvent,
+    $transaction: jest.fn(async (callback: (tx: any) => Promise<unknown>) =>
+      callback(prisma),
+    ),
+  };
 
-  return mockObj;
+  return { prisma, trades };
 }
 
-/**
- * Builds a raw Soroban event response matching the RPC API format.
- *
- * @param ledger - Ledger sequence number
- * @param eventType - Event type symbol (e.g., "TradeCreated")
- * @param tradeId - Trade ID value
- * @param eventData - Additional event data payload
- */
 function buildRawSorobanEvent(
   ledger: number,
-  eventType: string,
+  eventSymbol: string,
   tradeId: string,
-  eventData: Record<string, unknown> = {},
-): any {
+  eventData: Record<string, string> = {},
+) {
   return {
     ledger,
-    topic: [{ _scval: eventType }, { _scval: tradeId }],
+    topic: [eventSymbol, tradeId],
     value: {
       type: "map",
       value: Object.entries(eventData).map(([key, value]) => ({
         key: { type: "symbol", value: key },
-        val: { type: "string", value: String(value) },
+        val: { type: "string", value },
       })),
     },
     contractId: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-    id: `0000000000000000000-${ledger}`,
+    id: `event-${ledger}`,
     type: "contract",
-  };
+  } as any;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Integration Test Suite                                            */
-/* ------------------------------------------------------------------ */
-
-describe("Event Integration Tests", () => {
-  let mockPrisma: ReturnType<typeof createMockPrisma>;
+describe("Soroban event integration", () => {
   let eventListener: EventListenerService;
+  let prismaState: ReturnType<typeof createMockPrisma>;
 
   beforeEach(() => {
-    jest.useFakeTimers();
-    mockPrisma = createMockPrisma();
-    eventListener = new EventListenerService(mockPrisma);
-
-    // Reset all mocks
-    jest.clearAllMocks();
-    mockScValToNative.mockReset();
-    mockScValToNative.mockImplementation((val: any) => {
-      if (typeof val === "string") return val;
-      if (val && typeof val === "object" && "value" in val) return val.value;
-      return val;
-    });
-
-    // Suppress console output during tests
-    jest.spyOn(console, "log").mockImplementation(() => {});
-    jest.spyOn(console, "warn").mockImplementation(() => {});
-    jest.spyOn(console, "error").mockImplementation(() => {});
+    prismaState = createMockPrisma();
+    eventListener = new EventListenerService(prismaState.prisma as any);
+    mockScValToNative.mockClear();
   });
 
   afterEach(() => {
     eventListener.stop();
-    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
-  /* ================================================================ */
-  /*  Test 1: TradeCreated Event Verification                         */
-  /* ================================================================ */
-
-  describe("TradeCreated Event", () => {
-    it("should emit TradeCreated event with correct trade_id, buyer, seller, amount", async () => {
-      const tradeId = "12345678901234567890";
-      const buyer = "GABUYER1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-      const seller = "GASELLER1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-      const amount = 1000000000n; // 1000 USDC with 6 decimals
-      const ledger = 100001;
-
-      const rawEvent = buildRawSorobanEvent(ledger, "TradeCreated", tradeId, {
-        buyer,
-        seller,
-        amount: amount.toString(),
-      });
-
-      mockScValToNative
-        .mockReturnValueOnce("TradeCreated")
-        .mockReturnValueOnce(tradeId);
-
-      await eventListener.processEvent(rawEvent);
-
-      // Verify dispatchEvent was called with correct event type
-      expect(mockPrisma.trade.upsert).toHaveBeenCalledWith({
-        where: { tradeId },
-        update: {
-          status: EVENT_TO_STATUS[EventType.TradeCreated],
-          updatedAt: expect.any(Date),
-        },
-        create: {
-          tradeId,
-          buyerAddress: expect.any(String),
-          sellerAddress: expect.any(String),
-          amountUsdc: expect.any(String),
-          status: EVENT_TO_STATUS[EventType.TradeCreated],
-        },
-      });
-    });
-
-    it("should verify TradeCreated event field names match handler expectations", async () => {
-      const tradeId = "trade-001";
-      const eventData = {
+  it("decodes generated TradeCreated topics and persists the trade payload", async () => {
+    await eventListener.processEvent(
+      buildRawSorobanEvent(100001, "TRDCRT", "trade-001", {
         buyer: "GABUYER",
         seller: "GASELLER",
-        amount_usdc: "500000000",
-      };
+        amount_usdc: "1000",
+      }),
+    );
 
-      const rawEvent = buildRawSorobanEvent(
-        100002,
-        "TradeCreated",
-        tradeId,
-        eventData,
-      );
-      mockScValToNative
-        .mockReturnValueOnce("TradeCreated")
-        .mockReturnValueOnce(tradeId);
-
-      await eventListener.processEvent(rawEvent);
-
-      // Verify the handler receives data with expected field structure
-      const callArg = mockPrisma.trade.upsert.mock.calls[0][0];
-      expect(callArg.create).toHaveProperty("buyerAddress");
-      expect(callArg.create).toHaveProperty("sellerAddress");
-      expect(callArg.create).toHaveProperty("amountUsdc");
-      expect(callArg.create).toHaveProperty("status");
+    expect(prismaState.trades.get("trade-001")).toEqual({
+      tradeId: "trade-001",
+      buyerAddress: "GABUYER",
+      sellerAddress: "GASELLER",
+      amountUsdc: "1000",
+      status: EVENT_TO_STATUS[EventType.TradeCreated],
+      version: 1,
     });
-
-    it("should verify TradeCreated event values are correctly serialized", async () => {
-      const tradeId = "trade-serialize-test";
-      const buyer = "GABUYER123";
-      const seller = "GASELLER456";
-      const amount = "999888777666";
-
-      const rawEvent = buildRawSorobanEvent(100003, "TradeCreated", tradeId, {
-        buyer,
-        seller,
-        amount_usdc: amount,
-      });
-
-      mockScValToNative
-        .mockReturnValueOnce("TradeCreated")
-        .mockReturnValueOnce(tradeId);
-
-      await eventListener.processEvent(rawEvent);
-
-      // Verify event was processed (trade upsert called)
-      expect(mockPrisma.trade.upsert).toHaveBeenCalled();
-
-      // Verify tradeId is correctly passed through
-      const callArg = mockPrisma.trade.upsert.mock.calls[0][0];
-      expect(callArg.where.tradeId).toBe(tradeId);
-      expect(callArg.create.tradeId).toBe(tradeId);
-
-      // Note: Event data field extraction is handled by the event handler
-      // based on the event type and raw event payload
-    });
+    expect(prismaState.prisma.trade.create).toHaveBeenCalledTimes(1);
+    expect(prismaState.prisma.processedEvent.create).toHaveBeenCalledTimes(1);
   });
 
-  /* ================================================================ */
-  /*  Test 2: TradeFunded (TradeDeposited) Event Verification         */
-  /* ================================================================ */
+  it("continues to decode legacy event topic aliases", async () => {
+    await eventListener.processEvent(
+      buildRawSorobanEvent(100002, "TradeCreated", "trade-legacy"),
+    );
 
-  describe("TradeFunded Event (TradeDeposited)", () => {
-    it("should emit TradeFunded event when deposit successful", async () => {
-      const tradeId = "trade-funded-001";
-      const amount = "1000000000";
-      const ledger = 100010;
+    expect(prismaState.trades.get("trade-legacy")?.status).toBe(
+      TradeStatus.CREATED,
+    );
+  });
 
-      const rawEvent = buildRawSorobanEvent(ledger, "TradeFunded", tradeId, {
-        amount,
-      });
+  it("decodes and persists generated stream clawback events", async () => {
+    const event = buildRawSorobanEvent(100003, "CLWBCK", "stream-001", {
+      stream_id: "stream-001",
+      admin: "GAADMIN",
+      amount: "250",
+    });
 
-      mockScValToNative
-        .mockReturnValueOnce("TradeFunded")
-        .mockReturnValueOnce(tradeId);
+    await eventListener.processEvent(event);
 
-      await eventListener.processEvent(rawEvent);
-
-      expect(mockPrisma.trade.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            status: EVENT_TO_STATUS[EventType.TradeFunded],
-          }),
+    expect(prismaState.prisma.streamClawbackEvent.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          streamId_txHash: {
+            streamId: "stream-001",
+            txHash: "event-100003",
+          },
+        },
+        create: expect.objectContaining({
+          streamId: "stream-001",
+          admin: "GAADMIN",
+          amount: "250",
+          txHash: "event-100003",
         }),
-      );
-    });
-
-    it("should verify TradeFunded event contains trade_id and amount", async () => {
-      const tradeId = "trade-funded-002";
-      const amount = "500000000";
-
-      const rawEvent = buildRawSorobanEvent(100011, "TradeFunded", tradeId, {
-        amount,
-      });
-
-      mockScValToNative
-        .mockReturnValueOnce("TradeFunded")
-        .mockReturnValueOnce(tradeId);
-
-      await eventListener.processEvent(rawEvent);
-
-      // Verify event was processed (ledger persisted)
-      expect(mockPrisma.processedEvent.create).toHaveBeenCalled();
-    });
+      }),
+    );
+    expect(prismaState.prisma.processedEvent.create).toHaveBeenCalledTimes(1);
   });
 
-  /* ================================================================ */
-  /*  Test 3: DeliveryConfirmed Event Verification                    */
-  /* ================================================================ */
+  it("applies a valid trade lifecycle in ledger order", async () => {
+    const events = [
+      ["TRDCRT", { buyer: "GABUYER", seller: "GASELLER", amount_usdc: "20" }],
+      ["TRDFND", {}],
+      ["DELCNF", {}],
+      ["RELSD", {}],
+    ] as const;
 
-  describe("DeliveryConfirmed Event", () => {
-    it("should emit DeliveryConfirmed event when buyer confirms delivery", async () => {
-      const tradeId = "trade-delivered-001";
-      const deliveredAt = Date.now();
-      const ledger = 100020;
-
-      const rawEvent = buildRawSorobanEvent(
-        ledger,
-        "DeliveryConfirmed",
-        tradeId,
-        {
-          delivered_at: deliveredAt.toString(),
-        },
+    for (const [index, [symbol, data]] of events.entries()) {
+      await eventListener.processEvent(
+        buildRawSorobanEvent(100010 + index, symbol, "trade-lifecycle", data),
       );
+    }
 
-      mockScValToNative
-        .mockReturnValueOnce("DeliveryConfirmed")
-        .mockReturnValueOnce(tradeId);
-
-      await eventListener.processEvent(rawEvent);
-
-      expect(mockPrisma.trade.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            status: EVENT_TO_STATUS[EventType.DeliveryConfirmed],
-          }),
-        }),
-      );
-    });
-
-    it("should verify DeliveryConfirmed transitions trade to DELIVERED status", async () => {
-      const tradeId = "trade-delivered-002";
-
-      const rawEvent = buildRawSorobanEvent(
-        100021,
-        "DeliveryConfirmed",
-        tradeId,
-      );
-
-      mockScValToNative
-        .mockReturnValueOnce("DeliveryConfirmed")
-        .mockReturnValueOnce(tradeId);
-
-      await eventListener.processEvent(rawEvent);
-
-      const callArg = mockPrisma.trade.upsert.mock.calls[0][0];
-      expect(callArg.update?.status).toBe(
-        EVENT_TO_STATUS[EventType.DeliveryConfirmed],
-      );
-    });
+    expect(prismaState.trades.get("trade-lifecycle")?.status).toBe(
+      TradeStatus.COMPLETED,
+    );
+    expect(prismaState.prisma.trade.create).toHaveBeenCalledTimes(1);
+    expect(prismaState.prisma.trade.updateMany).toHaveBeenCalledTimes(3);
+    expect(prismaState.prisma.processedEvent.create).toHaveBeenCalledTimes(4);
   });
 
-  /* ================================================================ */
-  /*  Test 4: FundsReleased (TradeSettled) Event Verification         */
-  /* ================================================================ */
+  it("applies a dispute lifecycle from funding through resolution", async () => {
+    const events = [
+      ["TRDCRT", { buyer: "GABUYER", seller: "GASELLER", amount_usdc: "20" }],
+      ["TRDFND", {}],
+      ["DISINI", { initiator: "GABUYER", reason: "damaged goods" }],
+      ["DISRES", { resolver: "GAMEDIATOR", resolution: "refund" }],
+    ] as const;
 
-  describe("FundsReleased Event (TradeSettled)", () => {
-    it("should emit FundsReleased event at settlement", async () => {
-      const tradeId = "trade-settled-001";
-      const sellerAmount = "950000000";
-      const feeAmount = "50000000";
-      const ledger = 100030;
-
-      const rawEvent = buildRawSorobanEvent(ledger, "FundsReleased", tradeId, {
-        seller_amount: sellerAmount,
-        fee_amount: feeAmount,
-      });
-
-      mockScValToNative
-        .mockReturnValueOnce("FundsReleased")
-        .mockReturnValueOnce(tradeId);
-
-      await eventListener.processEvent(rawEvent);
-
-      expect(mockPrisma.trade.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            status: EVENT_TO_STATUS[EventType.FundsReleased],
-          }),
-        }),
+    for (const [index, [symbol, data]] of events.entries()) {
+      await eventListener.processEvent(
+        buildRawSorobanEvent(100015 + index, symbol, "trade-dispute", data),
       );
+    }
+
+    expect(prismaState.trades.get("trade-dispute")).toEqual({
+      tradeId: "trade-dispute",
+      buyerAddress: "GABUYER",
+      sellerAddress: "GASELLER",
+      amountUsdc: "20",
+      status: TradeStatus.COMPLETED,
+      version: 4,
     });
-
-    it("should verify FundsReleased event contains payout amounts", async () => {
-      const tradeId = "trade-settled-002";
-      const sellerAmount = "990000000";
-      const feeAmount = "10000000";
-
-      const rawEvent = buildRawSorobanEvent(100031, "FundsReleased", tradeId, {
-        seller_amount: sellerAmount,
-        fee_amount: feeAmount,
-      });
-
-      mockScValToNative
-        .mockReturnValueOnce("FundsReleased")
-        .mockReturnValueOnce(tradeId);
-
-      await eventListener.processEvent(rawEvent);
-
-      // Verify event was processed successfully
-      expect(mockPrisma.processedEvent.create).toHaveBeenCalled();
-    });
+    expect(prismaState.prisma.trade.updateMany).toHaveBeenCalledTimes(3);
+    expect(prismaState.prisma.processedEvent.create).toHaveBeenCalledTimes(4);
   });
 
-  /* ================================================================ */
-  /*  Test 5: DisputeInitiated Event Verification                     */
-  /* ================================================================ */
+  it("does not apply an out-of-order status transition", async () => {
+    await eventListener.processEvent(
+      buildRawSorobanEvent(100020, "TRDCRT", "trade-order"),
+    );
+    await eventListener.processEvent(
+      buildRawSorobanEvent(100021, "RELSD", "trade-order"),
+    );
 
-  describe("DisputeInitiated Event", () => {
-    it("should emit DisputeInitiated event when dispute is initiated", async () => {
-      const tradeId = "trade-disputed-001";
-      const initiator = "GABUYER1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-      const reasonHash = "QmXyz123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-      const ledger = 100040;
-
-      const rawEvent = buildRawSorobanEvent(
-        ledger,
-        "DisputeInitiated",
-        tradeId,
-        {
-          initiator,
-          reason_hash: reasonHash,
-        },
-      );
-
-      mockScValToNative
-        .mockReturnValueOnce("DisputeInitiated")
-        .mockReturnValueOnce(tradeId);
-
-      await eventListener.processEvent(rawEvent);
-
-      expect(mockPrisma.trade.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            status: EVENT_TO_STATUS[EventType.DisputeInitiated],
-          }),
-        }),
-      );
-    });
-
-    it("should verify DisputeInitiated transitions trade to DISPUTED status", async () => {
-      const tradeId = "trade-disputed-002";
-
-      const rawEvent = buildRawSorobanEvent(
-        100041,
-        "DisputeInitiated",
-        tradeId,
-      );
-
-      mockScValToNative
-        .mockReturnValueOnce("DisputeInitiated")
-        .mockReturnValueOnce(tradeId);
-
-      await eventListener.processEvent(rawEvent);
-
-      const callArg = mockPrisma.trade.upsert.mock.calls[0][0];
-      expect(callArg.update?.status).toBe(
-        EVENT_TO_STATUS[EventType.DisputeInitiated],
-      );
-    });
+    expect(prismaState.trades.get("trade-order")?.status).toBe(
+      TradeStatus.CREATED,
+    );
+    expect(prismaState.prisma.trade.updateMany).not.toHaveBeenCalled();
   });
 
-  /* ================================================================ */
-  /*  Test 6: DisputeResolved Event Verification                      */
-  /* ================================================================ */
+  it("deduplicates replayed events across listener restarts", async () => {
+    const event = buildRawSorobanEvent(100030, "TRDCRT", "trade-replay");
+    await eventListener.processEvent(event);
 
-  describe("DisputeResolved Event", () => {
-    it("should emit DisputeResolved event when mediator resolves dispute", async () => {
-      const tradeId = "trade-resolved-001";
-      const sellerPayout = "700000000";
-      const buyerRefund = "300000000";
-      const mediator = "GAMEDIATOR1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-      const ledger = 100050;
+    eventListener.stop();
+    eventListener = new EventListenerService(prismaState.prisma as any);
+    await eventListener.processEvent(event);
 
-      const rawEvent = buildRawSorobanEvent(
-        ledger,
-        "DisputeResolved",
-        tradeId,
-        {
-          seller_payout: sellerPayout,
-          buyer_refund: buyerRefund,
-          mediator,
-        },
-      );
-
-      mockScValToNative
-        .mockReturnValueOnce("DisputeResolved")
-        .mockReturnValueOnce(tradeId);
-
-      await eventListener.processEvent(rawEvent);
-
-      expect(mockPrisma.trade.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            status: EVENT_TO_STATUS[EventType.DisputeResolved],
-          }),
-        }),
-      );
-    });
-
-    it("should verify DisputeResolved transitions trade to COMPLETED status", async () => {
-      const tradeId = "trade-resolved-002";
-
-      const rawEvent = buildRawSorobanEvent(100051, "DisputeResolved", tradeId);
-
-      mockScValToNative
-        .mockReturnValueOnce("DisputeResolved")
-        .mockReturnValueOnce(tradeId);
-
-      await eventListener.processEvent(rawEvent);
-
-      const callArg = mockPrisma.trade.upsert.mock.calls[0][0];
-      expect(callArg.update?.status).toBe(
-        EVENT_TO_STATUS[EventType.DisputeResolved],
-      );
-    });
+    expect(prismaState.prisma.trade.create).toHaveBeenCalledTimes(1);
+    expect(prismaState.prisma.processedEvent.create).toHaveBeenCalledTimes(1);
   });
 
-  /* ================================================================ */
-  /*  Test 7: Event Order Verification                                */
-  /* ================================================================ */
-
-  describe("Event Order Verification", () => {
-    it("should process events in ledger sequence order", async () => {
-      const tradeId = "trade-order-test";
-      const ledgers = [100100, 100101, 100102, 100103];
-      const eventTypes = [
-        "TradeCreated",
-        "TradeFunded",
-        "DeliveryConfirmed",
-        "FundsReleased",
-      ];
-      const expectedStatuses = [
-        EVENT_TO_STATUS[EventType.TradeCreated],
-        EVENT_TO_STATUS[EventType.TradeFunded],
-        EVENT_TO_STATUS[EventType.DeliveryConfirmed],
-        EVENT_TO_STATUS[EventType.FundsReleased],
-      ];
-
-      // Process events in order
-      for (let i = 0; i < ledgers.length; i++) {
-        const rawEvent = buildRawSorobanEvent(
-          ledgers[i],
-          eventTypes[i],
-          tradeId,
-        );
-        mockScValToNative
-          .mockReturnValueOnce(eventTypes[i])
-          .mockReturnValueOnce(tradeId);
-
-        await eventListener.processEvent(rawEvent);
-      }
-
-      // Verify all events were processed in order
-      expect(mockPrisma.trade.upsert).toHaveBeenCalledTimes(4);
-
-      // Verify the order of status updates matches transaction order
-      const statusCalls = mockPrisma.trade.upsert.mock.calls.map(
-        (call: any) => call[0].update?.status,
+  it("processes a batch of unique events without losing records", async () => {
+    for (let index = 0; index < 25; index += 1) {
+      await eventListener.processEvent(
+        buildRawSorobanEvent(100100 + index, "TRDCRT", `trade-${index}`),
       );
-      expect(statusCalls).toEqual(expectedStatuses);
-    });
+    }
 
-    it("should handle out-of-order event arrival correctly", async () => {
-      const tradeId = "trade-ooo-test";
-
-      // Simulate events arriving out of order (higher ledger first)
-      const rawEvent2 = buildRawSorobanEvent(100202, "TradeFunded", tradeId);
-      const rawEvent1 = buildRawSorobanEvent(100201, "TradeCreated", tradeId);
-
-      // Process higher ledger first
-      mockScValToNative
-        .mockReturnValueOnce("TradeFunded")
-        .mockReturnValueOnce(tradeId);
-      await eventListener.processEvent(rawEvent2);
-
-      // Then process lower ledger
-      mockScValToNative
-        .mockReturnValueOnce("TradeCreated")
-        .mockReturnValueOnce(tradeId);
-      await eventListener.processEvent(rawEvent1);
-
-      // Both events should be processed (no duplicates rejected since different ledgers)
-      expect(mockPrisma.trade.upsert).toHaveBeenCalledTimes(2);
-    });
-
-    it("should maintain event order across multiple trades", async () => {
-      const trades = [
-        {
-          id: "trade-A",
-          ledgers: [200001, 200002],
-          types: ["TradeCreated", "TradeFunded"],
-        },
-        {
-          id: "trade-B",
-          ledgers: [200003, 200004],
-          types: ["TradeCreated", "TradeFunded"],
-        },
-        {
-          id: "trade-C",
-          ledgers: [200005, 200006],
-          types: ["TradeCreated", "TradeFunded"],
-        },
-      ];
-
-      const processedOrder: string[] = [];
-
-      for (const trade of trades) {
-        for (let i = 0; i < trade.ledgers.length; i++) {
-          const rawEvent = buildRawSorobanEvent(
-            trade.ledgers[i],
-            trade.types[i],
-            trade.id,
-          );
-          mockScValToNative
-            .mockReturnValueOnce(trade.types[i])
-            .mockReturnValueOnce(trade.id);
-
-          await eventListener.processEvent(rawEvent);
-          processedOrder.push(`${trade.id}-${trade.types[i]}`);
-        }
-      }
-
-      // Verify all events processed
-      expect(mockPrisma.trade.upsert).toHaveBeenCalledTimes(6);
-
-      // Verify order matches expected sequence
-      expect(processedOrder).toEqual([
-        "trade-A-TradeCreated",
-        "trade-A-TradeFunded",
-        "trade-B-TradeCreated",
-        "trade-B-TradeFunded",
-        "trade-C-TradeCreated",
-        "trade-C-TradeFunded",
-      ]);
-    });
+    expect(prismaState.trades.size).toBe(25);
+    expect(prismaState.prisma.trade.create).toHaveBeenCalledTimes(25);
+    expect(prismaState.prisma.processedEvent.create).toHaveBeenCalledTimes(25);
   });
 
-  /* ================================================================ */
-  /*  Test 8: High-Throughput Event Processing                        */
-  /* ================================================================ */
+  it("ignores unrecognized event symbols", async () => {
+    await eventListener.processEvent(
+      buildRawSorobanEvent(100200, "UNKNOWN", "trade-unknown"),
+    );
 
-  describe("High-Throughput Event Processing", () => {
-    it("should not lose events in high-throughput scenario", async () => {
-      const eventCount = 100;
-      const baseLedger = 300000;
-
-      for (let i = 0; i < eventCount; i++) {
-        const tradeId = `trade-ht-${i}`;
-        const ledger = baseLedger + i;
-        const eventType = i % 2 === 0 ? "TradeCreated" : "TradeFunded";
-
-        const rawEvent = buildRawSorobanEvent(ledger, eventType, tradeId);
-        mockScValToNative
-          .mockReturnValueOnce(eventType)
-          .mockReturnValueOnce(tradeId);
-
-        await eventListener.processEvent(rawEvent);
-      }
-
-      // Verify all events were processed (no loss)
-      expect(mockPrisma.trade.upsert).toHaveBeenCalledTimes(eventCount);
-      expect(mockPrisma.processedEvent.create).toHaveBeenCalledTimes(
-        eventCount,
-      );
-    });
-
-    it("should not duplicate events in high-throughput scenario", async () => {
-      const tradeId = "trade-dup-ht";
-      const ledger = 400000;
-      const rawEvent = buildRawSorobanEvent(ledger, "TradeCreated", tradeId);
-
-      // Process same event multiple times
-      for (let i = 0; i < 5; i++) {
-        mockScValToNative
-          .mockReturnValueOnce("TradeCreated")
-          .mockReturnValueOnce(tradeId);
-        await eventListener.processEvent(rawEvent);
-      }
-
-      // Should only process once (no duplicates)
-      expect(mockPrisma.trade.upsert).toHaveBeenCalledTimes(1);
-      expect(mockPrisma.processedEvent.create).toHaveBeenCalledTimes(1);
-    });
-
-    it("should handle rapid consecutive events without loss", async () => {
-      const eventCount = 50;
-      const baseLedger = 500000;
-
-      // Process events rapidly (simulating burst)
-      const promises = [];
-      for (let i = 0; i < eventCount; i++) {
-        const tradeId = `trade-burst-${i}`;
-        const ledger = baseLedger + i;
-        const rawEvent = buildRawSorobanEvent(ledger, "TradeCreated", tradeId);
-
-        mockScValToNative
-          .mockReturnValueOnce("TradeCreated")
-          .mockReturnValueOnce(tradeId);
-
-        promises.push(eventListener.processEvent(rawEvent));
-      }
-
-      await Promise.all(promises);
-
-      // Verify all events processed
-      expect(mockPrisma.trade.upsert).toHaveBeenCalledTimes(eventCount);
-    });
-
-    it("should handle batch of events from single poll", async () => {
-      const eventCount = 25;
-      const baseLedger = 600000;
-      const events: any[] = [];
-
-      for (let i = 0; i < eventCount; i++) {
-        const tradeId = `trade-batch-${i}`;
-        const ledger = baseLedger + i;
-        const eventType =
-          i % 3 === 0
-            ? "TradeCreated"
-            : i % 3 === 1
-              ? "TradeFunded"
-              : "DeliveryConfirmed";
-
-        events.push(buildRawSorobanEvent(ledger, eventType, tradeId));
-      }
-
-      // Mock scValToNative to return correct values for all events
-      for (let i = 0; i < eventCount; i++) {
-        const eventType =
-          i % 3 === 0
-            ? "TradeCreated"
-            : i % 3 === 1
-              ? "TradeFunded"
-              : "DeliveryConfirmed";
-        mockScValToNative
-          .mockReturnValueOnce(eventType)
-          .mockReturnValueOnce(`trade-batch-${i}`);
-      }
-
-      // Simulate pollEvents processing all events
-      jest
-        .spyOn(eventListener as any, "pollEvents")
-        .mockImplementation(async () => {
-          for (const event of events) {
-            await eventListener.processEvent(event);
-          }
-        });
-
-      await (eventListener as any).pollEvents();
-
-      // Verify all events in batch processed
-      expect(mockPrisma.trade.upsert).toHaveBeenCalledTimes(eventCount);
-    });
-  });
-
-  /* ================================================================ */
-  /*  Test 9: All Event Types Coverage                                */
-  /* ================================================================ */
-
-  describe("All Event Types Coverage", () => {
-    it("should successfully consume all 7+ event types", async () => {
-      const eventTypes: Array<{
-        symbol: string;
-        enumType: EventType;
-        ledger: number;
-      }> = [
-        {
-          symbol: "TradeCreated",
-          enumType: EventType.TradeCreated,
-          ledger: 700001,
-        },
-        {
-          symbol: "TradeFunded",
-          enumType: EventType.TradeFunded,
-          ledger: 700002,
-        },
-        {
-          symbol: "DeliveryConfirmed",
-          enumType: EventType.DeliveryConfirmed,
-          ledger: 700003,
-        },
-        {
-          symbol: "FundsReleased",
-          enumType: EventType.FundsReleased,
-          ledger: 700004,
-        },
-        {
-          symbol: "DisputeInitiated",
-          enumType: EventType.DisputeInitiated,
-          ledger: 700005,
-        },
-        {
-          symbol: "DisputeResolved",
-          enumType: EventType.DisputeResolved,
-          ledger: 700006,
-        },
-        // Note: TradeCancelled, EvidenceSubmitted, VideoProofSubmitted, MediatorAdded,
-        // MediatorRemoved events are emitted by contract but not yet handled by backend
-      ];
-
-      for (const { symbol, enumType, ledger } of eventTypes) {
-        mockPrisma.trade.upsert.mockClear();
-
-        const tradeId = `trade-event-${symbol}`;
-        const rawEvent = buildRawSorobanEvent(ledger, symbol, tradeId);
-
-        mockScValToNative
-          .mockReturnValueOnce(symbol)
-          .mockReturnValueOnce(tradeId);
-
-        await eventListener.processEvent(rawEvent);
-
-        // Verify event was processed
-        expect(mockPrisma.trade.upsert).toHaveBeenCalledTimes(1);
-        expect(mockPrisma.processedEvent.create).toHaveBeenCalled();
-      }
-    });
-
-    it("should map all event types to correct database statuses", () => {
-      // Verify EVENT_TO_STATUS mapping completeness
-      expect(EVENT_TO_STATUS[EventType.TradeCreated]).toBeDefined();
-      expect(EVENT_TO_STATUS[EventType.TradeFunded]).toBeDefined();
-      expect(EVENT_TO_STATUS[EventType.DeliveryConfirmed]).toBeDefined();
-      expect(EVENT_TO_STATUS[EventType.FundsReleased]).toBeDefined();
-      expect(EVENT_TO_STATUS[EventType.DisputeInitiated]).toBeDefined();
-      expect(EVENT_TO_STATUS[EventType.DisputeResolved]).toBeDefined();
-    });
-  });
-
-  /* ================================================================ */
-  /*  Test 10: Event Field Validation                                 */
-  /* ================================================================ */
-
-  describe("Event Field Validation", () => {
-    it("should verify event fields match database schema expectations", async () => {
-      const tradeId = "trade-schema-test";
-      const buyer = "GABUYER1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-      const seller = "GASELLER1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-      const amount = "1000000000";
-
-      const rawEvent = buildRawSorobanEvent(800001, "TradeCreated", tradeId, {
-        buyer,
-        seller,
-        amount_usdc: amount,
-      });
-
-      mockScValToNative
-        .mockReturnValueOnce("TradeCreated")
-        .mockReturnValueOnce(tradeId);
-
-      await eventListener.processEvent(rawEvent);
-
-      const callArg = mockPrisma.trade.upsert.mock.calls[0][0];
-
-      // Verify all required fields are present
-      expect(callArg.where).toHaveProperty("tradeId");
-      expect(callArg.create).toHaveProperty("tradeId");
-      expect(callArg.create).toHaveProperty("buyerAddress");
-      expect(callArg.create).toHaveProperty("sellerAddress");
-      expect(callArg.create).toHaveProperty("amountUsdc");
-      expect(callArg.create).toHaveProperty("status");
-
-      // Verify field types
-      expect(typeof callArg.create.tradeId).toBe("string");
-      expect(typeof callArg.create.buyerAddress).toBe("string");
-      expect(typeof callArg.create.sellerAddress).toBe("string");
-      expect(typeof callArg.create.amountUsdc).toBe("string");
-    });
-
-    it("should handle missing optional fields gracefully", async () => {
-      const tradeId = "trade-missing-fields";
-
-      const rawEvent = buildRawSorobanEvent(800002, "TradeFunded", tradeId, {});
-
-      mockScValToNative
-        .mockReturnValueOnce("TradeFunded")
-        .mockReturnValueOnce(tradeId);
-
-      await eventListener.processEvent(rawEvent);
-
-      // Should not throw, should process successfully
-      expect(mockPrisma.trade.upsert).toHaveBeenCalled();
-    });
-  });
-
-  /* ================================================================ */
-  /*  Test 11: Complete Trade Lifecycle Event Sequence                */
-  /* ================================================================ */
-
-  describe("Complete Trade Lifecycle Event Sequence", () => {
-    it("should process complete trade lifecycle: Created -> Funded -> Delivered -> Settled", async () => {
-      const tradeId = "trade-lifecycle-complete";
-      const lifecycle = [
-        {
-          event: "TradeCreated",
-          ledger: 900001,
-          expectedStatus: EVENT_TO_STATUS[EventType.TradeCreated],
-        },
-        {
-          event: "TradeFunded",
-          ledger: 900002,
-          expectedStatus: EVENT_TO_STATUS[EventType.TradeFunded],
-        },
-        {
-          event: "DeliveryConfirmed",
-          ledger: 900003,
-          expectedStatus: EVENT_TO_STATUS[EventType.DeliveryConfirmed],
-        },
-        {
-          event: "FundsReleased",
-          ledger: 900004,
-          expectedStatus: EVENT_TO_STATUS[EventType.FundsReleased],
-        },
-      ];
-
-      for (const { event, ledger, expectedStatus } of lifecycle) {
-        const rawEvent = buildRawSorobanEvent(ledger, event, tradeId);
-        mockScValToNative
-          .mockReturnValueOnce(event)
-          .mockReturnValueOnce(tradeId);
-
-        await eventListener.processEvent(rawEvent);
-
-        // Verify each step updates the status correctly
-        const callArg =
-          mockPrisma.trade.upsert.mock.calls[
-            mockPrisma.trade.upsert.mock.calls.length - 1
-          ][0];
-        expect(callArg.update?.status).toBe(expectedStatus);
-      }
-
-      // Verify all 4 lifecycle events processed
-      expect(mockPrisma.trade.upsert).toHaveBeenCalledTimes(4);
-    });
-
-    it("should process dispute lifecycle: Created -> Funded -> Disputed -> Resolved", async () => {
-      const tradeId = "trade-dispute-lifecycle";
-      const lifecycle = [
-        {
-          event: "TradeCreated",
-          ledger: 900011,
-          expectedStatus: EVENT_TO_STATUS[EventType.TradeCreated],
-        },
-        {
-          event: "TradeFunded",
-          ledger: 900012,
-          expectedStatus: EVENT_TO_STATUS[EventType.TradeFunded],
-        },
-        {
-          event: "DisputeInitiated",
-          ledger: 900013,
-          expectedStatus: EVENT_TO_STATUS[EventType.DisputeInitiated],
-        },
-        {
-          event: "DisputeResolved",
-          ledger: 900014,
-          expectedStatus: EVENT_TO_STATUS[EventType.DisputeResolved],
-        },
-      ];
-
-      for (const { event, ledger, expectedStatus } of lifecycle) {
-        const rawEvent = buildRawSorobanEvent(ledger, event, tradeId);
-        mockScValToNative
-          .mockReturnValueOnce(event)
-          .mockReturnValueOnce(tradeId);
-
-        await eventListener.processEvent(rawEvent);
-
-        const callArg =
-          mockPrisma.trade.upsert.mock.calls[
-            mockPrisma.trade.upsert.mock.calls.length - 1
-          ][0];
-        expect(callArg.update?.status).toBe(expectedStatus);
-      }
-
-      // Verify all 4 dispute lifecycle events processed
-      expect(mockPrisma.trade.upsert).toHaveBeenCalledTimes(4);
-    });
+    expect(prismaState.prisma.trade.create).not.toHaveBeenCalled();
+    expect(prismaState.prisma.processedEvent.create).not.toHaveBeenCalled();
   });
 });

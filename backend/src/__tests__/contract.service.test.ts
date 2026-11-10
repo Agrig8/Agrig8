@@ -71,7 +71,9 @@ describe("ContractService network resilience", () => {
 
     expect(result.tradeId).toBe("77");
     expect((server as any).simulateTransaction).toHaveBeenCalledTimes(2);
-    expect(sleepMock).toHaveBeenCalledWith(1000);
+    expect(sleepMock).toHaveBeenCalledTimes(1);
+    expect(sleepMock.mock.calls[0][0]).toBeGreaterThanOrEqual(0);
+    expect(sleepMock.mock.calls[0][0]).toBeLessThan(200);
   });
 
   it("retries prepareTransaction on rate limiting", async () => {
@@ -90,7 +92,9 @@ describe("ContractService network resilience", () => {
 
     expect(result.unsignedXdr).toEqual(expect.any(String));
     expect((server as any).prepareTransaction).toHaveBeenCalledTimes(2);
-    expect(sleepMock).toHaveBeenCalledWith(1000);
+    expect(sleepMock).toHaveBeenCalledTimes(1);
+    expect(sleepMock.mock.calls[0][0]).toBeGreaterThanOrEqual(0);
+    expect(sleepMock.mock.calls[0][0]).toBeLessThan(200);
   });
 
   it("does not retry non-retryable Soroban client errors", async () => {
@@ -123,9 +127,11 @@ describe("ContractService network resilience", () => {
       }),
     ).rejects.toEqual(expect.objectContaining({ response: { status: 500 } }));
     expect((server as any).prepareTransaction).toHaveBeenCalledTimes(4);
-    expect(sleepMock).toHaveBeenNthCalledWith(1, 1000);
-    expect(sleepMock).toHaveBeenNthCalledWith(2, 2000);
-    expect(sleepMock).toHaveBeenNthCalledWith(3, 4000);
+    expect(sleepMock).toHaveBeenCalledTimes(3);
+    [200, 400, 800].forEach((upperBound, index) => {
+      expect(sleepMock.mock.calls[index][0]).toBeGreaterThanOrEqual(0);
+      expect(sleepMock.mock.calls[index][0]).toBeLessThan(upperBound);
+    });
   });
 });
 

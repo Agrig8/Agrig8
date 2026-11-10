@@ -122,7 +122,12 @@ export function createAdminReportRouter(): Router {
     adminRateLimit,
     async (req: AuthRequest, res: Response, next) => {
       try {
-        const saved = adminReportService.getSavedFilter(req.params.id);
+        const id = req.params.id;
+        if (typeof id !== "string") {
+          res.status(400).json({ error: "Invalid saved filter id" });
+          return;
+        }
+        const saved = adminReportService.getSavedFilter(id);
         if (!saved) {
           res.status(404).json({ error: "Saved filter not found" });
           return;
@@ -146,7 +151,12 @@ export function createAdminReportRouter(): Router {
     adminMiddleware,
     adminRateLimit,
     (req: AuthRequest, res: Response) => {
-      const deleted = adminReportService.deleteSavedFilter(req.params.id);
+      const id = req.params.id;
+      if (typeof id !== "string") {
+        res.status(400).json({ error: "Invalid saved filter id" });
+        return;
+      }
+      const deleted = adminReportService.deleteSavedFilter(id);
       if (!deleted) {
         res.status(404).json({ error: "Saved filter not found" });
         return;

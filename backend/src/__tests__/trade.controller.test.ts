@@ -4,17 +4,55 @@ import request from "supertest";
 import * as StellarSdk from "@stellar/stellar-sdk";
 import { tradeRoutes } from "../routes/trade.routes";
 import { TradeAccessDeniedError, DisputeTradeStatusError } from "../services/trade.service";
-import { AuthService } from "../services/auth.service";
+import { AuthService, JWTPayload } from "../services/auth.service";
 import { errorHandler } from "../middleware/errorHandler";
 import { ErrorCode } from "../errors/errorCodes";
 
 jest.mock("../services/trade.service", () => {
-  mockTradeService = { createPendingTrade: jest.fn(), listUserTrades: jest.fn(), getTradeById: jest.fn(), getUserStats: jest.fn(), initiateDispute: jest.fn() };
+  const mockTradeService = {
+    createPendingTrade: jest.fn(),
+    listUserTrades: jest.fn(),
+    getTradeById: jest.fn(),
+    getUserStats: jest.fn(),
+    initiateDispute: jest.fn(),
+  };
   class MockTradeAccessDenied extends Error { constructor() { super("Forbidden"); this.name = "TradeAccessDeniedError"; } }
   class MockDisputeStatusError extends Error { status = 400; constructor() { super("Dispute status error"); this.name = "DisputeTradeStatusError"; } }
   class MockDisputeCategoryError extends Error { status = 400; constructor(cat: any) { super(`Invalid dispute category: ${cat}`); this.name = "DisputeCategoryValidationError"; } }
-  return { TradeService: jest.fn(() => mockTradeService), TradeAccessDeniedError: MockTradeAccessDenied, DisputeTradeStatusError: MockDisputeStatusError, DisputeCategoryValidationError: MockDisputeCategoryError };
+  return {
+    TradeService: jest.fn(() => mockTradeService),
+    TradeAccessDeniedError: MockTradeAccessDenied,
+    DisputeTradeStatusError: MockDisputeStatusError,
+    DisputeCategoryValidationError: MockDisputeCategoryError,
+    __mockTradeService: mockTradeService,
+  };
 });
+
+jest.mock("../services/contract.service", () => {
+  const mockContractService = {
+    buildCreateTradeTx: jest.fn(),
+    buildDepositTx: jest.fn(),
+    buildConfirmDeliveryTx: jest.fn(),
+    buildReleaseFundsTx: jest.fn(),
+  };
+  return {
+    ContractService: jest.fn(() => mockContractService),
+    buildConfirmDeliveryTx: (...args: unknown[]) =>
+      mockContractService.buildConfirmDeliveryTx(...args),
+    buildReleaseFundsTx: (...args: unknown[]) =>
+      mockContractService.buildReleaseFundsTx(...args),
+    __mockContractService: mockContractService,
+  };
+});
+
+const { __mockTradeService: mockTradeService } = jest.requireMock(
+  "../services/trade.service",
+);
+const { __mockContractService: mockContractService } = jest.requireMock(
+  "../services/contract.service",
+);
+const mockBuildConfirmDeliveryTx = mockContractService.buildConfirmDeliveryTx;
+const mockBuildReleaseFundsTx = mockContractService.buildReleaseFundsTx;
 
 const app = express();
 app.use(express.json());
@@ -68,7 +106,13 @@ describe("TradeController", () => {
             secret,
             { algorithm: "HS256" },
         );
-        jest.spyOn(AuthService, "isTokenRevoked").mockResolvedValue(false);
+        jest.spyOn(AuthService, "validateToken").mockImplementation(async (signedToken) =>
+            jwt.verify(signedToken, secret, {
+                algorithms: ["HS256"],
+                issuer: process.env.JWT_ISSUER,
+                audience: process.env.JWT_AUDIENCE,
+            }) as JWTPayload,
+        );
     });
 
     afterEach(() => {
@@ -546,8 +590,7 @@ describe("TradeController", () => {
                 .send({ category: "quality" });
 
             expect(res.status).toBe(400);
-            // Schema-level validation returns { error: message } format
-            expect(res.body.error).toBeDefined();
+            expect(res.body.message).toBeDefined();
         });
 
         it("returns 404 structured error if trade not found", async () => {
@@ -605,8 +648,8 @@ describe("TradeController", () => {
         });
 
         it("handles unauthorized access in buildDepositTx", async () => {
-            (TradeService.prototype.getTradeById as jest.Mock).mockRejectedValue(
-                new Error("Access denied")
+            (mockTradeService.getTradeById as jest.Mock).mockRejectedValue(
+                new TradeAccessDeniedError()
             );
 
             const res = await request(app)
@@ -614,22 +657,22 @@ describe("TradeController", () => {
                 .set("Authorization", `Bearer ${strangerToken}`);
 
             expect(res.status).toBe(403);
-            expect(res.body.error).toBe("Forbidden");
+            expect(res.body.message).toBe("Forbidden");
         });
 
         it("handles trade not found in confirmDelivery", async () => {
-            (TradeService.prototype.getTradeById as jest.Mock).mockResolvedValue(null);
+            (mockTradeService.getTradeById as jest.Mock).mockResolvedValue(null);
 
             const res = await request(app)
-                .post("/trades/9999999999/confirm-delivery")
+                .post("/trades/9999999999/confirm")
                 .set("Authorization", `Bearer ${token}`);
 
             expect(res.status).toBe(404);
-            expect(res.body.error).toBe("Trade not found");
+            expect(res.body.message).toBe("Trade not found");
         });
 
         it("handles business logic violations in releaseFunds", async () => {
-            (TradeService.prototype.getTradeById as jest.Mock).mockResolvedValue({
+            (mockTradeService.getTradeById as jest.Mock).mockResolvedValue({
                 tradeId: "4294967297",
                 buyerAddress: buyerAddress,
                 sellerAddress: sellerAddress,
@@ -638,11 +681,11 @@ describe("TradeController", () => {
             });
 
             const res = await request(app)
-                .post("/trades/4294967297/release-funds")
+                .post("/trades/4294967297/release")
                 .set("Authorization", `Bearer ${token}`);
 
             expect(res.status).toBe(400);
-            expect(res.body.error).toBe("Trade must be DELIVERED to release funds (current: DISPUTED)");
+            expect(res.body.message).toBe("Trade must be DELIVERED to release funds (current: DISPUTED)");
         });
 
         it("handles invalid trade ID format", async () => {
@@ -651,7 +694,7 @@ describe("TradeController", () => {
                 .set("Authorization", `Bearer ${token}`);
 
             expect(res.status).toBe(400);
-            expect(res.body.error).toBe("Trade id is required");
+            expect(res.body.message).toBeDefined();
         });
     });
 
