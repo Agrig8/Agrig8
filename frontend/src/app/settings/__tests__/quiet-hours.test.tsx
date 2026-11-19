@@ -54,6 +54,12 @@ jest.mock("@/lib/api/webhooks", () => ({
   AVAILABLE_EVENTS: ["trade.created", "trade.completed"],
 }));
 
+// ── Mock per-event channel section (has its own GET/PUT, tested separately) ──
+
+jest.mock("@/components/settings/EventChannelPreferences", () => ({
+  EventChannelPreferences: () => null,
+}));
+
 // ── Mock UI components not under test ─────────────────────────────────────────
 
 jest.mock("@/components/ui/ConfirmActionModal", () => ({
