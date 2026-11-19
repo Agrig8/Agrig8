@@ -791,3 +791,86 @@ export function __resetTradeExpiryMetricsForTests(): void {
   tradeExpiryTradesCounter = undefined;
   tradeExpiryDuration = undefined;
 }
+
+// ---------------------------------------------------------------------------
+// Evidence upload metrics (#173)
+//
+// Aggregate-only: labels are a fixed outcome set and a coarse size band. No
+// trade IDs, CIDs, filenames, uploader addresses, or evidence content are ever
+// recorded.
+// ---------------------------------------------------------------------------
+
+export type EvidenceUploadOutcome =
+  | "success"
+  | "validation_failed"
+  | "scan_blocked"
+  | "duplicate"
+  | "access_denied"
+  | "not_found"
+  | "failed";
+
+export type EvidenceSizeBand = "lt_1mb" | "1mb_to_10mb" | "10mb_to_50mb" | "gt_50mb" | "unknown";
+
+export interface EvidenceUploadMetricsRecorder {
+  recordEvidenceUpload(outcome: EvidenceUploadOutcome, sizeBand: EvidenceSizeBand): void;
+  recordEvidenceUploadRetry(): void;
+}
+
+let customEvidenceRecorder: EvidenceUploadMetricsRecorder | null = null;
+let evidenceUploadCounter: Counter | undefined;
+let evidenceUploadRetryCounter: Counter | undefined;
+
+export function __setEvidenceRecorderForTests(recorder: EvidenceUploadMetricsRecorder | null): void {
+  customEvidenceRecorder = recorder;
+}
+
+export function __resetEvidenceMetricsForTests(): void {
+  customEvidenceRecorder = null;
+  evidenceUploadCounter = undefined;
+  evidenceUploadRetryCounter = undefined;
+}
+
+function getEvidenceUploadCounter(): Counter {
+  if (!evidenceUploadCounter) {
+    evidenceUploadCounter = getMeter().createCounter("evidence_uploads_total", {
+      description:
+        "Evidence upload attempts by outcome and size band. Alert on a rising failed or scan_blocked share.",
+    });
+  }
+  return evidenceUploadCounter;
+}
+
+function getEvidenceUploadRetryCounter(): Counter {
+  if (!evidenceUploadRetryCounter) {
+    evidenceUploadRetryCounter = getMeter().createCounter("evidence_upload_retries_total", {
+      description:
+        "Evidence uploads resubmitting already-stored content (content-addressed duplicates), i.e. client retries that reached the server.",
+    });
+  }
+  return evidenceUploadRetryCounter;
+}
+
+/** Buckets a byte count into a coarse size band for metric labels. */
+export function classifyEvidenceSizeBand(bytes: number): EvidenceSizeBand {
+  if (!Number.isFinite(bytes) || bytes < 0) return "unknown";
+  const MB = 1024 * 1024;
+  if (bytes < MB) return "lt_1mb";
+  if (bytes < 10 * MB) return "1mb_to_10mb";
+  if (bytes <= 50 * MB) return "10mb_to_50mb";
+  return "gt_50mb";
+}
+
+export function recordEvidenceUpload(
+  outcome: EvidenceUploadOutcome,
+  sizeBand: EvidenceSizeBand,
+): void {
+  if (customEvidenceRecorder) {
+    customEvidenceRecorder.recordEvidenceUpload(outcome, sizeBand);
+    if (outcome === "duplicate") customEvidenceRecorder.recordEvidenceUploadRetry();
+    return;
+  }
+  getEvidenceUploadCounter().add(1, { outcome, size_band: sizeBand });
+  if (outcome === "duplicate") {
+    getEvidenceUploadRetryCounter().add(1);
+  }
+}
