@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import {
+  categorizeWalletError,
+  trackWalletConnectionFailure,
+} from "@/lib/wallet/state-machine";
+import {
   getAddress,
   isAllowed,
   isConnected,
@@ -162,7 +166,9 @@ async function connectWalletStore(): Promise<void> {
       }));
       return;
     }
-  } catch {
+    trackWalletConnectionFailure(categorizeWalletError(requestResult.error));
+  } catch (error) {
+    trackWalletConnectionFailure(categorizeWalletError(error));
     // Fall through to a full refresh so the store reflects the latest wallet state.
   }
 

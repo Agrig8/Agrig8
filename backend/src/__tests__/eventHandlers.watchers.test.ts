@@ -12,13 +12,15 @@ jest.mock("../services/webhook.service", () => ({
 }));
 jest.mock("../lib/escrowAudit", () => ({ logEscrowEvent: jest.fn() }));
 jest.mock("../lib/metrics", () => ({
+  ...jest.requireActual("../lib/metrics"),
   recordTradeFunnelEvent: jest.fn(),
   recordTimeToFund: jest.fn(),
   recordTimeToRelease: jest.fn(),
   recordTradeGmv: jest.fn(),
+  recordSettlementOutcome: jest.fn(),
 }));
 
-import { recordTradeFunnelEvent } from "../lib/metrics";
+import { recordTradeFunnelEvent, recordSettlementOutcome } from "../lib/metrics";
 import {
   handleTradeCreated,
   handleTradeFunded,
@@ -78,6 +80,22 @@ describe("event handlers notify watchers once per applied transition", () => {
     );
 
     expect(recordTradeFunnelEvent).toHaveBeenCalledWith("dispute_resolved");
+  });
+
+  it("records a split settlement outcome when a dispute pays both parties", async () => {
+    const splitEvent = {
+      ...event(EventType.DisputeResolved),
+      data: { seller_payout: BigInt(300), buyer_refund: BigInt(200) },
+    };
+    await handleDisputeResolved(txWith(TradeStatus.DISPUTED), splitEvent);
+
+    expect(recordSettlementOutcome).toHaveBeenCalledWith("split", "dispute");
+  });
+
+  it("records a released settlement outcome when funds are released", async () => {
+    await handleFundsReleased(txWith(TradeStatus.DELIVERED), event(EventType.FundsReleased));
+
+    expect(recordSettlementOutcome).toHaveBeenCalledWith("released", "release");
   });
 
   it.each(cases)("%s: a replayed event that does not transition notifies nobody", async (_n, handler, eventType, _from, to) => {

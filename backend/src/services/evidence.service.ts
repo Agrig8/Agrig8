@@ -4,6 +4,11 @@ import { prisma as defaultPrisma } from "../lib/db";
 import { IPFSService, ServiceUnavailableError } from "./ipfs.service";
 import { getAdminAllowlistLowercase } from "../lib/accessControl";
 import { env } from "../config/env";
+import {
+    classifyEvidenceSizeBand,
+    recordEvidenceUpload,
+    type EvidenceUploadOutcome,
+} from "../lib/metrics";
 
 export class EvidenceAccessDeniedError extends Error {
     status = 403;
@@ -74,6 +79,16 @@ type EvidenceDatabase = {
     tradeEvidence: Pick<PrismaClient["tradeEvidence"], "findMany" | "create">;
 };
 
+/** Maps an upload failure to a bounded metric outcome label. */
+export function classifyEvidenceUploadError(err: unknown): EvidenceUploadOutcome {
+    if (err instanceof EvidenceValidationError) return "validation_failed";
+    if (err instanceof EvidenceScanError) return "scan_blocked";
+    if (err instanceof EvidenceDuplicateError) return "duplicate";
+    if (err instanceof EvidenceAccessDeniedError) return "access_denied";
+    if (err instanceof EvidenceTradeNotFoundError) return "not_found";
+    return "failed";
+}
+
 export class EvidenceService {
     private ipfs: IPFSService;
     private scanner: EvidenceScanner;
@@ -134,6 +149,22 @@ export class EvidenceService {
      * Caller must be buyer or seller of the referenced trade.
      */
     async uploadVideoEvidence(
+        tradeId: string,
+        callerAddress: string,
+        file: Express.Multer.File,
+    ) {
+        const sizeBand = classifyEvidenceSizeBand((file as any)?.size ?? file?.buffer?.length ?? NaN);
+        try {
+            const result = await this.performVideoEvidenceUpload(tradeId, callerAddress, file);
+            recordEvidenceUpload("success", sizeBand);
+            return result;
+        } catch (err) {
+            recordEvidenceUpload(classifyEvidenceUploadError(err), sizeBand);
+            throw err;
+        }
+    }
+
+    private async performVideoEvidenceUpload(
         tradeId: string,
         callerAddress: string,
         file: Express.Multer.File,

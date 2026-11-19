@@ -1,0 +1,120 @@
+{
+  "title": "Amana — Pilot Coverage",
+  "uid": "amana-pilot-coverage",
+  "tags": ["amana", "pilot", "stored-as-code"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "5m",
+  "time": { "from": "now-7d", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Trades funded (last 24h)",
+      "description": "Pilot activation proxy: escrow trades that reached FUNDED. Aggregate count only; no participant identity is exposed. Source: innov8_trades_total{event=\"funded\"}.",
+      "type": "stat",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(increase(innov8_trades_total{event=\"funded\"}[24h]))", "legendFormat": "Funded" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Trades created (last 24h)",
+      "description": "Trades opened in the pilot. Compared with funded trades to show activation drop-off. Source: innov8_trades_total{event=\"created\"}.",
+      "type": "stat",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(increase(innov8_trades_total{event=\"created\"}[24h]))", "legendFormat": "Created" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Transaction volume (USDC, last 24h)",
+      "description": "Released and refunded trade value over 24 hours, converted from USDC cents. Source: innov8_trade_gmv_usdc_cents_sum.",
+      "type": "stat",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "min": 0 }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(increase(innov8_trade_gmv_usdc_cents_sum[24h])) / 100", "legendFormat": "Volume (USDC)" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Evidence uploads (last 24h)",
+      "description": "Evidence upload attempts by outcome. A rising failed or scan_blocked share indicates a pilot-wide upload problem. Source: evidence_uploads_total.",
+      "type": "stat",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(increase(evidence_uploads_total{outcome=\"success\"}[24h]))", "legendFormat": "Successful" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Activation funnel (per hour)",
+      "description": "Hourly trades created versus funded, showing how many pilot trades reach escrow funding.",
+      "type": "timeseries",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(increase(innov8_trades_total{event=\"created\"}[1h]))", "legendFormat": "Created" },
+        { "expr": "sum(increase(innov8_trades_total{event=\"funded\"}[1h]))", "legendFormat": "Funded" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Transaction volume by outcome (USDC per hour)",
+      "description": "Hourly trade value split into released and refunded settlements. Source: innov8_trade_gmv_usdc_cents_sum.",
+      "type": "timeseries",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "min": 0 }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (outcome) (increase(innov8_trade_gmv_usdc_cents_sum[1h])) / 100", "legendFormat": "{{outcome}}" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Settlement mix (last 24h)",
+      "description": "How funds were settled, by outcome (released, refunded, split) and source (release, dispute). Source: innov8_settlement_outcomes_total.",
+      "type": "bargauge",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (outcome, source) (increase(innov8_settlement_outcomes_total[24h]))", "legendFormat": "{{outcome}} / {{source}}" }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Evidence upload outcomes (per hour)",
+      "description": "Evidence upload attempts by outcome. Source: evidence_uploads_total.",
+      "type": "timeseries",
+      "datasource": "${datasource}",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (outcome) (increase(evidence_uploads_total[1h]))", "legendFormat": "{{outcome}}" }
+      ]
+    }
+  ]
+}

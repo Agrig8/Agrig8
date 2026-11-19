@@ -229,3 +229,72 @@ export function trackWalletState(
     trackFailure("wallet_blocked", { state, ...meta });
   }
 }
+
+// ---------------------------------------------------------------------------
+// Wallet connection failure telemetry (#174)
+//
+// Only bounded, anonymized labels are emitted: the wallet provider name, a
+// normalized network label, and an error category. Addresses, account
+// identifiers, raw error messages, and session data are never included.
+// ---------------------------------------------------------------------------
+
+export type WalletProviderLabel = "freighter";
+
+export type WalletNetworkLabel =
+  | "testnet"
+  | "public"
+  | "futurenet"
+  | "standalone"
+  | "other"
+  | "unknown";
+
+export type WalletFailureCategory =
+  | "not_installed"
+  | "declined"
+  | "locked"
+  | "timeout"
+  | "wrong_network"
+  | "unknown";
+
+const KNOWN_WALLET_NETWORKS: Readonly<Record<string, WalletNetworkLabel>> = {
+  TESTNET: "testnet",
+  PUBLIC: "public",
+  FUTURENET: "futurenet",
+  STANDALONE: "standalone",
+};
+
+/** Maps a raw network passphrase/name to a fixed label; anything unexpected becomes "other". */
+export function normalizeWalletNetwork(network: string | null | undefined): WalletNetworkLabel {
+  if (!network) return "unknown";
+  return KNOWN_WALLET_NETWORKS[network.trim().toUpperCase()] ?? "other";
+}
+
+/**
+ * Categorizes a raw wallet error into a fixed label. The raw message is used
+ * only for matching and is never forwarded to analytics.
+ */
+export function categorizeWalletError(error: unknown): WalletFailureCategory {
+  const message = (
+    error instanceof Error ? error.message : typeof error === "string" ? error : ""
+  ).toLowerCase();
+  if (/declin|reject|denied|cancel/.test(message)) return "declined";
+  if (/lock/.test(message)) return "locked";
+  if (/timeout|timed out/.test(message)) return "timeout";
+  if (/not installed|not found|not detected|unavailable/.test(message)) return "not_installed";
+  return "unknown";
+}
+
+/**
+ * Emits one anonymized connection-failure event. Call only for a failed
+ * connection attempt (not for idle or successful states).
+ */
+export function trackWalletConnectionFailure(
+  category: WalletFailureCategory,
+  options: { network?: string | null; provider?: WalletProviderLabel } = {},
+): void {
+  trackFailure("wallet_connection_failed", {
+    provider: options.provider ?? "freighter",
+    network: normalizeWalletNetwork(options.network),
+    error_category: category,
+  });
+}

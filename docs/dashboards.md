@@ -34,12 +34,40 @@ the backend metrics ingress policy. Panels remain empty until the
 corresponding trade events have occurred and been scraped. No additional
 exporter is needed.
 
+## Pilot Coverage Dashboard
+
+[`infra/grafana/dashboards/pilot-coverage.json`](../infra/grafana/dashboards/pilot-coverage.json)
+(uid `amana-pilot-coverage`) shows pilot activation and transaction volume
+using aggregate series only. It is provisioned by the same file provider and
+Prometheus datasource as the other dashboards.
+
+| Panel | Source metric | Meaning |
+|---|---|---|
+| Trades funded / created (24h) | `innov8_trades_total{event="funded"}`, `event="created"` | Activation proxy: trades that reached escrow funding |
+| Activation funnel (per hour) | `innov8_trades_total` | Created versus funded trades per hour |
+| Transaction volume (USDC) | `innov8_trade_gmv_usdc_cents_sum` | Trade value per 24 hours and per hour, split by outcome |
+| Settlement mix (24h) | `innov8_settlement_outcomes_total` | Released, refunded, and split settlements by source |
+| Evidence upload outcomes | `evidence_uploads_total` | Upload success, failure, and scan-block counts |
+
+Privacy: every panel uses fixed labels only (`event`, `outcome`, `source`).
+No panel groups by trade ID, wallet address, or user, so individual
+participants cannot be identified from the dashboard. The activation metric
+counts funded trades, not distinct participants. A per-region coverage view
+needs a bounded region label on the trade metrics, which does not exist yet.
+
+The `evidence_uploads_total`, `innov8_settlement_outcomes_total` metrics are
+recorded in [`backend/src/lib/metrics.ts`](../backend/src/lib/metrics.ts).
+Panels stay empty until the corresponding events have occurred and been
+scraped.
+
 ## Files
 
 - [`infra/grafana/dashboards/golden-signals.json`](../infra/grafana/dashboards/golden-signals.json)
   — the dashboard definition itself.
 - [`infra/grafana/dashboards/business-metrics.json`](../infra/grafana/dashboards/business-metrics.json)
   — business-level trade, dispute, and released payout metrics.
+- [`infra/grafana/dashboards/pilot-coverage.json`](../infra/grafana/dashboards/pilot-coverage.json)
+  — pilot activation, transaction volume, and aggregate evidence and settlement health.
 - [`infra/grafana/provisioning/dashboards/dashboards.yaml`](../infra/grafana/provisioning/dashboards/dashboards.yaml)
   and [`infra/grafana/provisioning/datasources/datasources.yaml`](../infra/grafana/provisioning/datasources/datasources.yaml)
   — Grafana's file-provisioning config, so the dashboard and its Prometheus
