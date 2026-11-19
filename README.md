@@ -181,6 +181,8 @@ Key architectural decisions are documented as ADRs in [`docs/adr/`](./docs/adr):
 
 innov8 is an open-source project aimed at improving food security and trade efficiency. We welcome developers, designers, and agricultural experts!
 
+Please read the [Code of Conduct](./CODE_OF_CONDUCT.md) before participating.
+
 1. Fork the Project.
 2. Create your Feature Branch (`git checkout -b feature/NewFeature`).
 3. Commit your Changes (`git commit -m 'Add NewFeature'`).
