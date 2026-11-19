@@ -3,6 +3,7 @@ import { HealthService } from "../services/health.service";
 import { appLogger } from "../middleware/logger";
 import { apiLatencyTracker } from "../lib/latencyPercentiles";
 import { traceSamplingBudget } from "../lib/traceSamplingBudget";
+import { dataFreshness } from "../lib/dataFreshness";
 
 /**
  * Ledger lag above this many ledgers (approximately 5 seconds each) is
@@ -45,6 +46,14 @@ export function createHealthDetailRouter(): Router {
      */
     router.get("/trace-sampling", (_req: Request, res: Response) => {
         res.json(traceSamplingBudget.snapshot());
+    });
+
+    /**
+     * GET /health/data-freshness (#180)
+     * Last successful collection per dashboard data source, with stale warnings.
+     */
+    router.get("/data-freshness", (_req: Request, res: Response) => {
+        res.json(dataFreshness.report());
     });
 
     router.get("/detail", async (req: Request, res: Response, _next: NextFunction) => {
