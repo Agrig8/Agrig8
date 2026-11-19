@@ -12,7 +12,7 @@ context. An issue qualifies only when **all** of the following hold.
 3. **Testable** — a unit, integration, or documentation check can confirm the
    change. The issue names the command to run.
 4. **Mentor available** — a maintainer is named in the issue and commits to
-   answering questions within the response SLA (see `maintainer-response-sla.md`).
+   answering questions within the [response SLA](maintainer-response-sla.md).
 5. **No security-sensitive surface** — the issue does not touch access control,
    key handling, contract admin functions, or money math. Those need experienced
    reviewers.

@@ -62,3 +62,32 @@ describe("good-first-issue rubric (docs/governance/good-first-issue-rubric.md)",
     }
   });
 });
+
+describe("maintainer response SLA (docs/governance/maintainer-response-sla.md)", () => {
+  const doc = read("maintainer-response-sla.md");
+
+  it("sets a first-response target for issues, pull requests, and security reports", () => {
+    for (const activity of ["New issue", "New pull request", "Security report"]) {
+      expect(doc).toMatch(new RegExp(`\\| ${activity}[^|]*\\|[^|]*(business day)`));
+    }
+  });
+
+  it("defines stale handling and never closes security reports as stale", () => {
+    expect(doc).toContain("## Stale handling");
+    expect(doc).toMatch(/Security reports are never closed as stale/);
+  });
+
+  it("links to governance and SLO documents that exist", () => {
+    const links = [...doc.matchAll(/\]\(([^)]+\.md)\)/g)].map((m) => m[1]);
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(fs.existsSync(path.resolve(GOVERNANCE_DIR, link))).toBe(true);
+    }
+  });
+});
+
+describe("good-first-issue rubric cross-links", () => {
+  it("links to the maintainer response SLA", () => {
+    expect(read("good-first-issue-rubric.md")).toContain("(maintainer-response-sla.md)");
+  });
+});
