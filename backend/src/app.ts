@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { errorHandler } from "./middleware/errorHandler";
 import { correlationIdMiddleware } from "./middleware/correlationId.middleware";
 import { tracingMiddleware } from "./middleware/tracing.middleware";
+import { latencyTrackingMiddleware } from "./lib/latencyPercentiles";
 import loggerMiddleware, { appLogger } from "./middleware/logger";
 import { bodyParsers } from "./middleware/bodyLimits";
 import { requestLoggerMiddleware } from "./middleware/request.logger.middleware";
@@ -110,6 +111,7 @@ export function createApp(isShuttingDown?: () => boolean): express.Application {
   app.use(loggerMiddleware);
   // Structured per-request logger: method, path, status, durationMs, correlationId, userId, userAgent, ip
   app.use(requestLoggerMiddleware);
+  app.use(latencyTrackingMiddleware);
 
   // Enhanced health check with deep introspection
   app.use("/health", createHealthRouter(isShuttingDown));

@@ -1,6 +1,7 @@
 import { trace, SpanKind, SpanStatusCode, Span, SamplingDecision, SamplingResult, Attributes, Context } from '@opentelemetry/api';
 import { env } from './env';
 import { appLogger } from '../middleware/logger';
+import { CountingSpanExporter, traceSamplingBudget } from '../lib/traceSamplingBudget';
 
 /**
  * OpenTelemetry configuration for distributed tracing
@@ -131,18 +132,28 @@ export class TailBasedSampler {
     _spanKind: SpanKind,
     attributes: Attributes,
   ): SamplingResult {
+    const { result, rule } = this.decide(name, attributes);
+    traceSamplingBudget.recordDecision(rule, result.decision === SamplingDecision.RECORD_AND_SAMPLED);
+    return result;
+  }
+
+  /** Applies the sampling rules and returns the decision plus the rule that made it (#178). */
+  private decide(name: string, attributes: Attributes): { result: SamplingResult; rule: string } {
     const url = String(attributes['http.url'] ?? attributes['http.target'] ?? name ?? '');
 
     // Never sample noisy / non-diagnostic routes
     if (NEVER_SAMPLE_ROUTE_PATTERNS.some((p) => p.test(url))) {
-      return { decision: SamplingDecision.NOT_RECORD };
+      return { result: { decision: SamplingDecision.NOT_RECORD }, rule: 'never_sample' };
     }
 
     // Always keep high-value payout and dispute routes
     if (HIGH_VALUE_ROUTE_PATTERNS.some((p) => p.test(url))) {
       return {
-        decision: SamplingDecision.RECORD_AND_SAMPLED,
-        attributes: { 'sampling.rule': 'high_value_route' },
+        result: {
+          decision: SamplingDecision.RECORD_AND_SAMPLED,
+          attributes: { 'sampling.rule': 'high_value_route' },
+        },
+        rule: 'high_value_route',
       };
     }
 
@@ -150,8 +161,11 @@ export class TailBasedSampler {
     const statusCode = Number(attributes['http.status_code'] ?? 0);
     if (statusCode >= 400 || attributes['error'] === true) {
       return {
-        decision: SamplingDecision.RECORD_AND_SAMPLED,
-        attributes: { 'sampling.rule': 'error' },
+        result: {
+          decision: SamplingDecision.RECORD_AND_SAMPLED,
+          attributes: { 'sampling.rule': 'error' },
+        },
+        rule: 'error',
       };
     }
 
@@ -161,25 +175,31 @@ export class TailBasedSampler {
     if (matchingPrefixes.length > 0) {
       const longest = matchingPrefixes.reduce((a, b) => (a.length >= b.length ? a : b));
       const rate = overrides[longest]!;
-      if (rate === 0) return { decision: SamplingDecision.NOT_RECORD };
+      if (rate === 0) return { result: { decision: SamplingDecision.NOT_RECORD }, rule: 'route_override' };
       if (rate >= 1 || Math.random() < rate) {
         return {
-          decision: SamplingDecision.RECORD_AND_SAMPLED,
-          attributes: { 'sampling.rule': 'route_override', 'sampling.rate': rate },
+          result: {
+            decision: SamplingDecision.RECORD_AND_SAMPLED,
+            attributes: { 'sampling.rule': 'route_override', 'sampling.rate': rate },
+          },
+          rule: 'route_override',
         };
       }
-      return { decision: SamplingDecision.NOT_RECORD };
+      return { result: { decision: SamplingDecision.NOT_RECORD }, rule: 'route_override' };
     }
 
     // Baseline probabilistic sampling for all other healthy traffic
     if (Math.random() < this.config.baselineRate) {
       return {
-        decision: SamplingDecision.RECORD_AND_SAMPLED,
-        attributes: { 'sampling.rule': 'baseline', 'sampling.rate': this.config.baselineRate },
+        result: {
+          decision: SamplingDecision.RECORD_AND_SAMPLED,
+          attributes: { 'sampling.rule': 'baseline', 'sampling.rate': this.config.baselineRate },
+        },
+        rule: 'baseline',
       };
     }
 
-    return { decision: SamplingDecision.NOT_RECORD };
+    return { result: { decision: SamplingDecision.NOT_RECORD }, rule: 'baseline' };
   }
 }
 
@@ -244,7 +264,7 @@ function buildSdk() {
       [SemanticResourceAttributes.SERVICE_VERSION]: service_version,
       [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: env.NODE_ENV || 'development',
     }),
-    traceExporter: exporters.length > 0 ? exporters[0] : undefined,
+    traceExporter: exporters.length > 0 ? new CountingSpanExporter(exporters[0]) : undefined,
     metricReader: prometheusExporter,
     // Tail-based sampling strategy (#231): keep all errors, payout routes, and
     // slow traces at 100%; reduce healthy baseline traffic to control storage cost.
