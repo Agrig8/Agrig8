@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Spinner } from "@/components/ui/Spinner";
 import { webhooksApi, AVAILABLE_EVENTS, Webhook } from "@/lib/api/webhooks";
 import { request } from "@/lib/api/client";
+import { useUIStore } from "@/stores/uiStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -771,6 +772,8 @@ function LinkedWalletsSection({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
+  const displayCurrency = useUIStore((st) => st.currencyDisplay);
+  const setDisplayCurrency = useUIStore((st) => st.setCurrency);
   const {
     address,
     token,
@@ -1067,6 +1070,17 @@ export default function SettingsPage() {
                 { value: "USD", label: "USD — US Dollar" },
                 { value: "EUR", label: "EUR — Euro" },
                 { value: "GBP", label: "GBP — British Pound" },
+              ]}
+            />
+            <Divider />
+            <SelectField
+              label="Display currency"
+              description="Currency used to show trade amounts. The on-chain cNGN value stays authoritative."
+              value={displayCurrency}
+              onChange={(v) => setDisplayCurrency(v as "USDC" | "NGN")}
+              options={[
+                { value: "USDC", label: "USDC — USD Coin" },
+                { value: "NGN", label: "NGN — Nigerian Naira" },
               ]}
             />
             <Divider />
