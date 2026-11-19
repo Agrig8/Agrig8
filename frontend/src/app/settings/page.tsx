@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Spinner } from "@/components/ui/Spinner";
 import { webhooksApi, AVAILABLE_EVENTS, Webhook } from "@/lib/api/webhooks";
 import { request } from "@/lib/api/client";
+import { EventChannelPreferences } from "@/components/settings/EventChannelPreferences";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1037,6 +1038,8 @@ export default function SettingsPage() {
               onStartChange={(v) => setNotif("quietHoursStart", v)}
               onEndChange={(v) => setNotif("quietHoursEnd", v)}
             />
+            <Divider />
+            <EventChannelPreferences token={token} />
           </div>
         </SectionCard>
 
