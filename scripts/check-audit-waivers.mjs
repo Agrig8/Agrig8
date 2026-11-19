@@ -8,7 +8,8 @@
  *   node scripts/check-audit-waivers.mjs cargo <workspaceDir>
  *
  * Behaviour:
- *   - Loads .github/audit-waivers.json.
+ *   - Loads .github/audit-waivers.json. Each waiver needs `advisory`, `owner`
+ *     and `expires` (YYYY-MM-DD); malformed entries exit 2.
  *   - Any waiver whose `expires` date is in the past fails the run immediately,
  *     regardless of whether the advisory still fires — expired waivers must be
  *     renewed or removed via review.
@@ -23,7 +24,7 @@
 
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -39,6 +40,35 @@ function todayUtc() {
   return new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z");
 }
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Pure validation of one ecosystem's waiver list. Every waiver must name an
+ * advisory, an accountable `owner`, and an `expires` date (YYYY-MM-DD, UTC).
+ * Returns { active, expired } or throws a descriptive Error on malformed input.
+ */
+export function classifyWaivers(list, now = todayUtc()) {
+  const active = [];
+  const expired = [];
+  for (const w of list) {
+    if (!w || typeof w.advisory !== "string" || w.advisory.trim() === "") {
+      throw new Error(`Malformed waiver entry (needs string \`advisory\`): ${JSON.stringify(w)}`);
+    }
+    if (typeof w.owner !== "string" || w.owner.trim() === "") {
+      throw new Error(`Waiver ${w.advisory} is missing a non-empty \`owner\``);
+    }
+    if (typeof w.expires !== "string" || !DATE_RE.test(w.expires)) {
+      throw new Error(`Waiver ${w.advisory} needs \`expires\` as YYYY-MM-DD (got: ${w.expires})`);
+    }
+    const expires = new Date(w.expires + "T00:00:00Z");
+    if (Number.isNaN(expires.getTime()) || expires.toISOString().slice(0, 10) !== w.expires) {
+      throw new Error(`Waiver ${w.advisory} has an invalid \`expires\` date: ${w.expires}`);
+    }
+    (expires < now ? expired : active).push(w);
+  }
+  return { active, expired };
+}
+
 function loadWaivers(ecosystem) {
   let parsed;
   try {
@@ -47,20 +77,11 @@ function loadWaivers(ecosystem) {
     fail(`Could not read ${WAIVER_FILE}: ${err.message}`, 2);
   }
   const list = Array.isArray(parsed[ecosystem]) ? parsed[ecosystem] : [];
-  const now = todayUtc();
-  const expired = [];
-  const active = [];
-  for (const w of list) {
-    if (!w || typeof w.advisory !== "string" || typeof w.expires !== "string") {
-      fail(`Malformed waiver entry (needs string \`advisory\` and \`expires\`): ${JSON.stringify(w)}`, 2);
-    }
-    const expires = new Date(w.expires + "T00:00:00Z");
-    if (Number.isNaN(expires.getTime())) {
-      fail(`Waiver ${w.advisory} has an invalid \`expires\` date: ${w.expires}`, 2);
-    }
-    (expires < now ? expired : active).push(w);
+  try {
+    return classifyWaivers(list);
+  } catch (err) {
+    fail(err.message, 2);
   }
-  return { active, expired };
 }
 
 function runAudit(ecosystem, workspaceDir) {
@@ -168,4 +189,6 @@ function main() {
   process.exit(1);
 }
 
-main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}
