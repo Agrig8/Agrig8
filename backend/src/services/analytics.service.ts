@@ -1,4 +1,5 @@
 import { appLogger } from "../middleware/logger";
+import { sanitizeAnalyticsMetadata } from "./analyticsFunnel";
 
 export type AnalyticsEventName =
   | "trade.created"
@@ -28,12 +29,14 @@ export class AnalyticsService {
     tradeId?: string,
     metadata?: Record<string, unknown>,
   ): void {
+    // Strip identifiers and personal data before the payload is logged or persisted.
+    const sanitized = sanitizeAnalyticsMetadata(metadata);
     const payload: AnalyticsEvent = {
       event,
       timestamp: new Date().toISOString(),
       userId,
       ...(tradeId !== undefined && { tradeId }),
-      ...(metadata !== undefined && { metadata }),
+      ...(sanitized !== undefined && { metadata: sanitized }),
     };
 
     // Structured log — picked up by any log aggregator

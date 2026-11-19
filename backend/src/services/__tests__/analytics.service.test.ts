@@ -97,3 +97,18 @@ describe("AnalyticsService", () => {
     expect(result).toBeUndefined();
   });
 });
+
+describe("AnalyticsService metadata privacy", () => {
+  it("strips wallet and personal-data keys from the logged payload", () => {
+    jest.clearAllMocks();
+    const service = new AnalyticsService();
+    service.track("trade.created", "user-1", "trade-1", {
+      amount: 100,
+      buyerAddress: "GBUYER",
+      email: "buyer@example.com",
+    });
+
+    const [logObj] = mockLogger.info.mock.calls[0];
+    expect(logObj.analytics.metadata).toEqual({ amount: 100 });
+  });
+});
