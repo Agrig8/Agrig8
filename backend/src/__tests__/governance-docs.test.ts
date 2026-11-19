@@ -37,3 +37,42 @@ describe("CODE_OF_CONDUCT.md", () => {
     expect(readme).toContain("(./CODE_OF_CONDUCT.md)");
   });
 });
+
+describe("CONTRIBUTING.md", () => {
+  const guide = readRepoFile("CONTRIBUTING.md");
+
+  it("exists at the repository root with a top-level heading", () => {
+    expect(guide.startsWith("# Contribution Welcome Guide")).toBe(true);
+  });
+
+  it("covers a first-contribution path for every area of the project", () => {
+    for (const area of [
+      "| Documentation |",
+      "| Tests |",
+      "| UI (frontend) |",
+      "| Backend |",
+      "| Mobile |",
+      "| Contracts |",
+    ]) {
+      expect(guide).toContain(area);
+    }
+  });
+
+  it("links to the code of conduct and the pull request template", () => {
+    expect(guide).toContain("./CODE_OF_CONDUCT.md");
+    expect(guide).toContain("./.github/pull_request_template.md");
+    expect(fs.existsSync(path.join(repoRoot, ".github/pull_request_template.md"))).toBe(true);
+  });
+
+  it("links only to local files that exist", () => {
+    const localLinks = [...guide.matchAll(/\]\((\.\/[^)#]+)\)/g)].map((m) => m[1]);
+    expect(localLinks.length).toBeGreaterThan(0);
+    for (const link of localLinks) {
+      expect(fs.existsSync(path.join(repoRoot, link))).toBe(true);
+    }
+  });
+
+  it("explains the closes-issue convention for pull requests", () => {
+    expect(guide).toContain("Closes #<issue-number>");
+  });
+});
