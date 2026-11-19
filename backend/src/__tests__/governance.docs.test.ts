@@ -38,3 +38,27 @@ describe("issue label policy (docs/governance/label-policy.md)", () => {
     expect(fs.existsSync(path.join(REPO_ROOT, "SECURITY.md"))).toBe(true);
   });
 });
+
+describe("good-first-issue rubric (docs/governance/good-first-issue-rubric.md)", () => {
+  const doc = read("good-first-issue-rubric.md");
+
+  it("lists the required criteria, disqualifiers, and process", () => {
+    for (const heading of ["## Required criteria", "## Disqualifiers", "## Process"]) {
+      expect(doc).toContain(heading);
+    }
+  });
+
+  it("requires a bounded scope, acceptance criteria, tests, and a mentor", () => {
+    for (const phrase of ["Bounded scope", "Clear acceptance criteria", "Testable", "Mentor available"]) {
+      expect(doc).toContain(phrase);
+    }
+  });
+
+  it("links to governance documents that exist", () => {
+    const links = [...doc.matchAll(/\]\(([^)]+\.md)\)/g)].map((m) => m[1]);
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(fs.existsSync(path.resolve(GOVERNANCE_DIR, link))).toBe(true);
+    }
+  });
+});
