@@ -1,0 +1,14 @@
+# Code owners for pull request review.
+# Later rules take precedence over earlier ones; see pr-review-ownership docs.
+# The team handles below are placeholders. Replace them with real GitHub teams
+# (format: @org/team) before enabling required code owner reviews.
+
+/backend/                       @Agrig8/backend-maintainers
+/frontend/                      @Agrig8/frontend-maintainers
+/mobile/                        @Agrig8/mobile-maintainers
+/contracts/                     @Agrig8/contract-maintainers
+/contracts/amana_escrow/src/    @Agrig8/contract-security
+/infra/                         @Agrig8/infra-maintainers
+/.github/                       @Agrig8/infra-maintainers
+/docs/governance/               @Agrig8/governance-maintainers
+/SECURITY.md                    @Agrig8/contract-security
