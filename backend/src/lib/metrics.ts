@@ -874,3 +874,77 @@ export function recordEvidenceUpload(
     getEvidenceUploadRetryCounter().add(1);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Settlement outcome metrics (#175)
+//
+// Aggregate counts of how escrowed funds were settled, derived from verified
+// contract events. Labels are a fixed set; no trade IDs, amounts, or party
+// addresses are recorded.
+// ---------------------------------------------------------------------------
+
+export type SettlementOutcome = "released" | "refunded" | "split";
+export type SettlementSource = "release" | "dispute";
+
+export interface SettlementMetricsRecorder {
+  recordSettlementOutcome(outcome: SettlementOutcome, source: SettlementSource): void;
+}
+
+let customSettlementRecorder: SettlementMetricsRecorder | null = null;
+let settlementOutcomeCounter: Counter | undefined;
+
+export function __setSettlementRecorderForTests(recorder: SettlementMetricsRecorder | null): void {
+  customSettlementRecorder = recorder;
+}
+
+export function __resetSettlementMetricsForTests(): void {
+  customSettlementRecorder = null;
+  settlementOutcomeCounter = undefined;
+}
+
+function getSettlementOutcomeCounter(): Counter {
+  if (!settlementOutcomeCounter) {
+    settlementOutcomeCounter = getMeter().createCounter("innov8_settlement_outcomes_total", {
+      description:
+        "Settled escrow outcomes from verified events, by outcome (released, refunded, split) and source (release, dispute).",
+    });
+  }
+  return settlementOutcomeCounter;
+}
+
+/** True when a contract payout amount (bigint, number, or string) is greater than zero. */
+function isPositiveAmount(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  try {
+    return BigInt(String(value)) > BigInt(0);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Classifies a resolved dispute by its payouts. Returns null when both payouts
+ * are zero, since no funds moved and there is no outcome to count.
+ */
+export function classifyDisputeSettlement(
+  sellerPayout: unknown,
+  buyerRefund: unknown,
+): SettlementOutcome | null {
+  const toSeller = isPositiveAmount(sellerPayout);
+  const toBuyer = isPositiveAmount(buyerRefund);
+  if (toSeller && toBuyer) return "split";
+  if (toSeller) return "released";
+  if (toBuyer) return "refunded";
+  return null;
+}
+
+export function recordSettlementOutcome(
+  outcome: SettlementOutcome,
+  source: SettlementSource,
+): void {
+  if (customSettlementRecorder) {
+    customSettlementRecorder.recordSettlementOutcome(outcome, source);
+    return;
+  }
+  getSettlementOutcomeCounter().add(1, { outcome, source });
+}

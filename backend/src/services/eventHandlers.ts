@@ -9,6 +9,8 @@ import {
   recordTimeToFund,
   recordTimeToRelease,
   recordTradeGmv,
+  classifyDisputeSettlement,
+  recordSettlementOutcome,
 } from "../lib/metrics";
 
 type TradeCreatePayload = {
@@ -235,6 +237,7 @@ export async function handleFundsReleased(
   recordTradeFunnelEvent("released");
   const amountStr = event.data.amount_usdc != null ? String(event.data.amount_usdc) : "0";
   recordTradeGmv(amountStr, "released");
+  recordSettlementOutcome("released", "release");
   webhookService.dispatch(event.tradeId, TradeStatus.COMPLETED, {
     ledger: event.ledgerSequence,
   });
@@ -300,6 +303,13 @@ export async function handleDisputeResolved(
     "[EventHandler] DisputeResolved",
   );
   recordTradeFunnelEvent("dispute_resolved");
+  const disputeOutcome = classifyDisputeSettlement(
+    event.data.seller_payout,
+    event.data.buyer_refund,
+  );
+  if (disputeOutcome) {
+    recordSettlementOutcome(disputeOutcome, "dispute");
+  }
   webhookService.dispatch(event.tradeId, TradeStatus.COMPLETED, {
     ledger: event.ledgerSequence,
   });
