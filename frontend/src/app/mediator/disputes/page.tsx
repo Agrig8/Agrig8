@@ -66,6 +66,13 @@ function persistSavedViews(address: string, views: SavedView[]): void {
   }
 }
 
+const AGE_FILTERS: { label: string; value: "any" | "1" | "7" | "30" }[] = [
+  { label: "Any age", value: "any" },
+  { label: "Older than 1 day", value: "1" },
+  { label: "Older than 7 days", value: "7" },
+  { label: "Older than 30 days", value: "30" },
+];
+
 const FILTERS: { label: string; value: DisputeStatus | "all" }[] = [
   { label: "All Active", value: "all" },
   { label: "Open", value: "OPEN" },
@@ -102,6 +109,7 @@ export default function MediatorDisputesPage() {
   const [currentCursorIndex, setCurrentCursorIndex] = useState(0);
 
   const [disputes, setDisputes] = useState<DisputeResponse[]>([]);
+  const [minAgeDays, setMinAgeDays] = useState<"any" | "1" | "7" | "30">("any");
   const [nextCursor, setNextCursor] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +144,15 @@ export default function MediatorDisputesPage() {
     persistSavedViews(address, updated);
   }
   const currentCursor = cursorStack[currentCursorIndex] ?? null;
+
+  const visibleDisputes = useMemo(() => {
+    if (minAgeDays === "any") return disputes;
+    const cutoff = Date.now() - Number(minAgeDays) * 24 * 60 * 60 * 1000;
+    return disputes.filter((d) => {
+      const created = Date.parse(d.createdAt);
+      return Number.isNaN(created) || created <= cutoff;
+    });
+  }, [disputes, minAgeDays]);
 
   const fetchDisputes = useCallback(async () => {
     if (!isAuthenticated || !token || !isMediator) {
@@ -282,6 +299,19 @@ export default function MediatorDisputesPage() {
         onChange={handleFilter}
         className="mb-3"
       />
+      <div className="mb-3 flex items-center gap-2">
+        <label htmlFor="dispute-age-filter" className="text-sm text-text-secondary">Age</label>
+        <select
+          id="dispute-age-filter"
+          value={minAgeDays}
+          onChange={(e) => setMinAgeDays(e.target.value as "any" | "1" | "7" | "30")}
+          className="rounded-md border border-border-default bg-bg-elevated px-2 py-1 text-sm"
+        >
+          {AGE_FILTERS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
 
       {/* Saved views */}
       <div className="flex flex-wrap items-center gap-2 mb-6" data-testid="saved-views">
@@ -341,10 +371,10 @@ export default function MediatorDisputesPage() {
 
       {/* Disputes list */}
       <div className="space-y-4" role="list" aria-label="Disputes">
-        {disputes.length === 0 ? (
+        {visibleDisputes.length === 0 ? (
           <div className="text-center py-12 text-text-secondary">No disputes found</div>
         ) : (
-          disputes.map((dispute) => {
+          visibleDisputes.map((dispute) => {
             const breaching = isBreachingSLA(dispute.createdAt);
             const ageLabel = formatAge(dispute.createdAt);
 
