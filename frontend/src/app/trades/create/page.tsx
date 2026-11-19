@@ -6,6 +6,7 @@ import Step2Negotiation from "./steps/Step2Negotiation";
 import Step3Review from "./steps/Step3Review";
 import StepCsvImport from "./steps/StepCsvImport";
 import Link from "next/link";
+import { RoleGuide } from "@/components/trade/RoleGuide";
 
 const STEPS = [
   { index: 1, label: "Details" },
@@ -138,6 +139,7 @@ function CreateTradeInner() {
             />
           ) : (
             <>
+              <RoleGuide />
               <StepIndicator />
               {step === 1 && (
                 <>
