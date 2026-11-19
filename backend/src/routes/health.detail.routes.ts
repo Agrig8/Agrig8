@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { HealthService } from "../services/health.service";
 import { appLogger } from "../middleware/logger";
 import { apiLatencyTracker } from "../lib/latencyPercentiles";
+import { traceSamplingBudget } from "../lib/traceSamplingBudget";
 
 /**
  * Ledger lag above this many ledgers (approximately 5 seconds each) is
@@ -36,6 +37,14 @@ export function createHealthDetailRouter(): Router {
      */
     router.get("/latency", (_req: Request, res: Response) => {
         res.json({ windowSize: 1000, series: apiLatencyTracker.summaries() });
+    });
+
+    /**
+     * GET /health/trace-sampling (#178)
+     * Sampled vs dropped spans by rule, plus exported and failed export counts.
+     */
+    router.get("/trace-sampling", (_req: Request, res: Response) => {
+        res.json(traceSamplingBudget.snapshot());
     });
 
     router.get("/detail", async (req: Request, res: Response, _next: NextFunction) => {
