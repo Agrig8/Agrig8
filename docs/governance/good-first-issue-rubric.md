@@ -31,7 +31,7 @@ context. An issue qualifies only when **all** of the following hold.
 1. Triage: a maintainer checks the issue against the rubric before adding the label.
 2. Audit: a maintainer re-checks open `good first issue` labels each release. Labels that fail the rubric are removed.
 3. Claiming: a contributor comments to claim the issue. Claims expire after 7 days without a linked draft pull request.
-4. Review: pull requests for these issues follow the normal review ownership rules (see `pr-review-ownership.md`).
+4. Review: pull requests for these issues follow the normal [review ownership](pr-review-ownership.md) rules.
 
 ## Issue template checklist
 

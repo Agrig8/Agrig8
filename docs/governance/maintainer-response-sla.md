@@ -23,7 +23,7 @@ They are goals for business days (Monday to Friday, UTC), not guarantees.
 ## Escalation
 
 If a target is missed, any contributor may comment with `@`-mention of the
-on-call maintainer listed in the review ownership (see `pr-review-ownership.md`) document.
+on-call maintainer listed in the [review ownership](pr-review-ownership.md) document.
 Missed security targets are escalated to the repository owner the same day.
 
 ## Measurement

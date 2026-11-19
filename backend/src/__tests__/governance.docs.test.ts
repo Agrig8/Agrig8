@@ -91,3 +91,48 @@ describe("good-first-issue rubric cross-links", () => {
     expect(read("good-first-issue-rubric.md")).toContain("(maintainer-response-sla.md)");
   });
 });
+
+describe("pull request review ownership (docs/governance/pr-review-ownership.md)", () => {
+  const doc = read("pr-review-ownership.md");
+  const codeowners = fs.readFileSync(path.join(REPO_ROOT, ".github", "CODEOWNERS"), "utf8");
+
+  it("documents review expectations for contracts, security, apps, and infra", () => {
+    for (const heading of ["### Contract", "### Security", "### Frontend, backend, mobile", "### Infrastructure and CI"]) {
+      expect(doc).toContain(heading);
+    }
+  });
+
+  it("links to repository documents that exist", () => {
+    const links = [...doc.matchAll(/\]\(([^)]+\.md)\)/g)].map((m) => m[1]);
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(fs.existsSync(path.resolve(GOVERNANCE_DIR, link))).toBe(true);
+    }
+  });
+
+  it("CODEOWNERS covers every owned top-level path with a valid team handle", () => {
+    const rules = codeowners
+      .split("\n")
+      .filter((line) => line.trim() !== "" && !line.trim().startsWith("#"))
+      .map((line) => line.trim().split(/\s+/));
+    const paths = rules.map(([p]) => p);
+    for (const owned of ["/backend/", "/frontend/", "/mobile/", "/contracts/", "/infra/", "/.github/", "/SECURITY.md"]) {
+      expect(paths).toContain(owned);
+    }
+    for (const [pattern, ...owners] of rules) {
+      expect(owners.length).toBeGreaterThan(0);
+      for (const owner of owners) {
+        expect(owner).toMatch(/^@[A-Za-z0-9-]+\/[A-Za-z0-9_-]+$/);
+      }
+      const target = path.join(REPO_ROOT, pattern);
+      expect(fs.existsSync(target)).toBe(true);
+    }
+  });
+});
+
+describe("governance cross-links", () => {
+  it("rubric and SLA link to the review ownership document", () => {
+    expect(read("good-first-issue-rubric.md")).toContain("(pr-review-ownership.md)");
+    expect(read("maintainer-response-sla.md")).toContain("(pr-review-ownership.md)");
+  });
+});
