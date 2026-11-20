@@ -218,6 +218,12 @@ jobs:
         if: needs.changes.outputs.frontend != 'true'
         run: echo "No frontend file changes detected, required gate passed."
 
+      - name: Failure summary
+        if: failure()
+        run: |
+          echo "::error title=Frontend gate failed::Reproduce locally: cd frontend && corepack pnpm lint && corepack pnpm build && corepack pnpm test"
+          echo "### Frontend gate failed: \`cd frontend && corepack pnpm lint && corepack pnpm build && corepack pnpm test\`" >> "$GITHUB_STEP_SUMMARY"
+
   bundle-size-report:
     name: Bundle Size Report
     runs-on: ubuntu-latest
@@ -524,6 +530,12 @@ jobs:
         if: needs.changes.outputs.backend != 'true'
         run: echo "No backend file changes detected, required gate passed."
 
+      - name: Failure summary
+        if: failure()
+        run: |
+          echo "::error title=Backend gate failed::Reproduce locally: cd backend && corepack pnpm build && corepack pnpm test"
+          echo "### Backend gate failed: \`cd backend && corepack pnpm build && corepack pnpm test\`" >> "$GITHUB_STEP_SUMMARY"
+
   mobile:
     name: Mobile Required Gate
     runs-on: ubuntu-latest
@@ -731,6 +743,12 @@ jobs:
           path: mobile/.detox-artifacts/
           retention-days: 7
 
+      - name: Failure summary
+        if: failure()
+        run: |
+          echo "::error title=Mobile gate failed::Reproduce locally: cd mobile && corepack pnpm exec tsc --noEmit && corepack pnpm lint && corepack pnpm test"
+          echo "### Mobile gate failed: \`cd mobile && corepack pnpm exec tsc --noEmit && corepack pnpm lint && corepack pnpm test\`" >> "$GITHUB_STEP_SUMMARY"
+
   contracts:
     name: Contracts Required Gate
     runs-on: ubuntu-latest
@@ -794,19 +812,15 @@ jobs:
             exit 1
           fi
 
-      - name: Failure summary
-        if: failure()
-        run: |
-          {
-            echo "### Contracts gate failed"
-            echo "Failed job step: see the annotated log above."
-            echo "Reproduce locally: \`cd contracts/amana_escrow && cargo test --locked\`"
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "::error title=Contracts gate failed::Run 'cargo test --locked' in contracts/amana_escrow"
-
       - name: Skip note (no contract changes)
         if: needs.changes.outputs.contracts != 'true'
         run: echo "No contract file changes detected, required gate passed."
+
+      - name: Failure summary
+        if: failure()
+        run: |
+          echo "::error title=Contracts gate failed::Reproduce locally: cd contracts/amana_escrow && cargo test --locked"
+          echo "### Contracts gate failed: \`cd contracts/amana_escrow && cargo test --locked\`" >> "$GITHUB_STEP_SUMMARY"
 
   storage-layout:
     name: Storage Layout Required Gate
