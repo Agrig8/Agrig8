@@ -79,6 +79,30 @@ describe("AuditTrailService", () => {
         expect(timestamps).toEqual(sorted);
     });
 
+    it("exports audit records as actor/action/target/timestamp entries", async () => {
+        prisma.trade.findUnique = jest.fn().mockResolvedValue(mockTrade);
+
+        const entries = await service.getAuditExport(TRADE_ID, BUYER);
+
+        expect(entries.length).toBeGreaterThan(0);
+        for (const entry of entries) {
+            expect(typeof entry.actor).toBe("string");
+            expect(typeof entry.action).toBe("string");
+            expect(entry.target).toBe(TRADE_ID);
+            expect(typeof entry.timestamp).toBe("string");
+            expect(Number.isNaN(Date.parse(entry.timestamp))).toBe(false);
+        }
+        expect(entries.some((e) => e.action === "CREATED" && e.actor === BUYER)).toBe(true);
+    });
+
+    it("applies the same access rules to the audit export", async () => {
+        prisma.trade.findUnique = jest.fn().mockResolvedValue(mockTrade);
+
+        await expect(service.getAuditExport(TRADE_ID, STRANGER)).rejects.toBeInstanceOf(
+            AuditTrailAccessDeniedError,
+        );
+    });
+
     it("returns 403 for unauthorized user", async () => {
         prisma.trade.findUnique = jest.fn().mockResolvedValue(mockTrade);
 

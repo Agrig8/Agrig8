@@ -80,6 +80,36 @@ export function createAuditTrailRouter(auditService = new AuditTrailService()) {
         }
     });
 
+    // GET /trades/:id/history/export — documented audit export format
+    // (actor, action, target, timestamp records). See docs/audit-export-format.md.
+    router.get("/:id/history/export", authMiddleware, async (req: AuthRequest, res: Response) => {
+        const callerAddress = req.user?.walletAddress;
+        if (!callerAddress) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+
+        try {
+            const entries = await auditService.getAuditExport(req.params.id as string, callerAddress);
+            res.status(200).json({
+                format: "actor-action-target-timestamp",
+                tradeId: req.params.id as string,
+                entries,
+            });
+        } catch (err) {
+            if (err instanceof AuditTrailTradeNotFoundError) {
+                res.status(404).json({ error: err.message });
+                return;
+            }
+            if (err instanceof AuditTrailAccessDeniedError) {
+                res.status(403).json({ error: err.message });
+                return;
+            }
+            appLogger.error({ err }, "[AuditTrailRoute] Export error");
+            res.status(500).json({ error: "Failed to export audit history" });
+        }
+    });
+
     // GET /trades/:id/history/verify?signature=<base64>
     router.get("/:id/history/verify", authMiddleware, async (req: AuthRequest, res: Response) => {
         const callerAddress = req.user?.walletAddress;
