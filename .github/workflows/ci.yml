@@ -794,6 +794,16 @@ jobs:
             exit 1
           fi
 
+      - name: Failure summary
+        if: failure()
+        run: |
+          {
+            echo "### Contracts gate failed"
+            echo "Failed job step: see the annotated log above."
+            echo "Reproduce locally: \`cd contracts/amana_escrow && cargo test --locked\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error title=Contracts gate failed::Run 'cargo test --locked' in contracts/amana_escrow"
+
       - name: Skip note (no contract changes)
         if: needs.changes.outputs.contracts != 'true'
         run: echo "No contract file changes detected, required gate passed."
