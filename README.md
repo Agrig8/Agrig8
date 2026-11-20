@@ -39,27 +39,111 @@ To provide a programmable safety net for regional commodity trading. Amana ensur
 - `mobile/` → React Native Expo environment (mobile wallet, notification, and trade UX)
 - `contracts/` → Rust/Soroban smart contract environment
 
+### Prerequisites
+
+Before running any stack, verify the following are installed:
+
+| Tool | Minimum version | Check |
+|---|---|---|
+| Node.js | 20 LTS | `node --version` |
+| pnpm (via Corepack) | 9+ | `corepack pnpm --version` |
+| Rust + Cargo | stable | `cargo --version` |
+| Docker | 24+ | `docker --version` |
+| Git | 2.40+ | `git --version` |
+
+Enable Corepack once after installing Node.js:
+
+```sh
+corepack enable
+```
+
+---
+
 ### Frontend setup
 
-1. `cd frontend`
-2. `cp .env.example .env.local`
-3. `corepack pnpm install`
-4. `corepack pnpm dev`
+```sh
+cd frontend
+cp .env.example .env.local   # fill in NEXT_PUBLIC_API_URL and NEXT_PUBLIC_STELLAR_NETWORK at minimum
+corepack pnpm install
+corepack pnpm dev
+```
+
+**Success:** `http://localhost:3000` loads the trade list page without console errors.
+
+**Required variables** (see `frontend/.env.example` for the full list):
+
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_STELLAR_NETWORK` | `testnet` for local dev |
+| `NEXT_PUBLIC_API_URL` | Backend URL, default `http://localhost:4000` |
+
+---
 
 ### Backend setup
 
-1. `cd backend`
-2. `cp .env.example .env`
-3. `cp .env.tracing.example .env.tracing` (for distributed tracing configuration)
-4. `corepack pnpm install`
-5. `corepack pnpm dev`
+```sh
+cd backend
+cp .env.example .env
+cp .env.tracing.example .env.tracing   # optional: distributed tracing
+corepack pnpm install
+# Start Postgres and Redis (requires Docker):
+docker compose up -d postgres redis
+# Apply migrations:
+corepack pnpm exec prisma migrate dev
+corepack pnpm dev
+```
+
+**Success:** `http://localhost:4000/health` returns `{"status":"ok"}`.
+
+**Required variables** (see `backend/.env.example` for the full list):
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `JWT_SECRET` | Min 32-character secret for auth tokens |
+| `AMANA_ESCROW_CONTRACT_ID` | Soroban escrow contract address |
+| `USDC_CONTRACT_ID` | USDC token contract address |
+| `ADMIN_SECRET_KEY` | Signing key for admin Stellar operations |
+
+> **Startup validation:** the backend refuses to start if any required variable is missing or malformed and prints a concise list of every problem. Fix the listed variables and restart.
+
+#### Seed dev data
+
+After migrating, populate the database with deterministic users, trades, and dispute records for UI development:
+
+```sh
+corepack pnpm run seed:dev
+```
+
+Re-running the command is safe — all records are upserted so no duplicates are created. It creates:
+
+- 3 users (seller, buyer, mediator)
+- 5 trades (PENDING, FUNDED, DISPUTED, COMPLETED, REFUNDED)
+- 1 dispute record on the DISPUTED trade
+
+---
 
 ### Mobile setup
 
-1. `cd mobile`
-2. `cp .env.example .env.local`
-3. `corepack pnpm install`
-4. `corepack pnpm start`
+```sh
+cd mobile
+cp .env.example .env.local   # fill in EXPO_PUBLIC_API_URL at minimum
+corepack pnpm install
+corepack pnpm start
+```
+
+**Success:** the Expo CLI prints a QR code and the Metro bundler URL (`http://localhost:8081`). Scan with Expo Go or press `i`/`a` to open in an iOS/Android simulator.
+
+**Required variables** (see `mobile/.env.example` for the full list):
+
+| Variable | Purpose |
+|---|---|
+| `EXPO_PUBLIC_API_URL` | Backend URL, default `http://localhost:4000` |
+| `EXPO_PUBLIC_STELLAR_NETWORK` | `testnet` for local dev |
+
+> **Startup validation:** the app logs a clear error to the Expo console if any required variable is missing, and falls back gracefully so the red-screen is avoided.
+
+---
 
 ### Backend API docs
 
@@ -69,10 +153,16 @@ To provide a programmable safety net for regional commodity trading. Amana ensur
 
 The backend writes `backend/src/docs/openapi.json` from the YAML spec in non-production runs so reviewers can inspect either format.
 
+---
+
 ### Contracts setup
 
-1. `cd contracts/amana_escrow`
-2. `cargo build`
+```sh
+cd contracts/amana_escrow
+cargo build
+```
+
+**Success:** `cargo build` exits 0 and produces a WASM binary under `target/wasm32-unknown-unknown/`.
 
 ## 🔒 Required PR CI Gates
 

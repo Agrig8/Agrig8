@@ -16,6 +16,10 @@ import { initCrashReporting } from './services/crashReporting.service';
 import { BiometricLockOverlay } from './components/BiometricLockOverlay';
 import { useBiometricLock } from './hooks/useBiometricLock';
 
+// Validate required env vars before the first render (issue #132).
+import { validateMobileEnv } from './config/env';
+validateMobileEnv();
+
 // Install before the first render so boot-time crashes are captured too.
 initCrashReporting();
 
