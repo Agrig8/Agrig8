@@ -2,6 +2,7 @@
   "scripts": {
     "codegen:events": "node scripts/codegen-events.mjs",
     "codegen:events:check": "node scripts/codegen-events.mjs --check",
+    "check:openapi-types-drift": "node scripts/check-openapi-types-drift.mjs",
     "test:scripts": "node --experimental-vm-modules node_modules/.bin/jest --config jest.scripts.config.mjs"
   },
   "devDependencies": {
