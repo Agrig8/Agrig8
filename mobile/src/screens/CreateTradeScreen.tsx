@@ -433,6 +433,18 @@ export default function CreateTradeScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={[styles.content, contentStyle]}>
         <StepIndicator current={step} total={3} />
 
+        {isOffline && (
+          <View
+            style={styles.offlineBanner}
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+          >
+            <Text style={styles.offlineBannerText}>
+              📶 You're offline — this trade will be queued and submitted when you reconnect.
+            </Text>
+          </View>
+        )}
+
         {step === 0 && (
           <Step1Details data={data} update={update} onNext={() => setStep(1)} />
         )}
@@ -463,6 +475,15 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#1a3a1a' },
   content: { padding: 16, gap: 8 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1a3a1a', marginBottom: 12 },
+  offlineBanner: {
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 4,
+  },
+  offlineBannerText: { fontSize: 13, color: '#92400E', lineHeight: 18 },
 });
 
 const stepStyles = StyleSheet.create({

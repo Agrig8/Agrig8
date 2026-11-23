@@ -88,7 +88,11 @@ function TradeCard({
     >
       <View style={styles.cardRow}>
         <Text style={styles.tradeId}>#{trade.tradeId.slice(0, 8)}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: `${statusColor}22` }]}>
+        <View
+          style={[styles.statusBadge, { backgroundColor: `${statusColor}22` }]}
+          accessibilityRole="text"
+          accessibilityLabel={`Status: ${STATUS_LABELS[trade.status] ?? trade.status}`}
+        >
           <Text style={[styles.statusText, { color: statusColor }]}>{STATUS_LABELS[trade.status] ?? trade.status}</Text>
         </View>
       </View>

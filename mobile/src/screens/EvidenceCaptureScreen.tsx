@@ -239,6 +239,14 @@ export default function EvidenceCaptureScreen({ route, navigation }: Props) {
             {uploadState === 'error' && uploadError && (
               <View style={styles.errorBanner}>
                 <Text style={styles.errorText}>Upload failed: {uploadError}</Text>
+                <TouchableOpacity
+                  style={styles.retryUploadBtn}
+                  onPress={handleUpload}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry evidence upload"
+                >
+                  <Text style={styles.retryUploadBtnText}>↺ Retry Upload</Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -349,8 +357,16 @@ const styles = StyleSheet.create({
   capturedReady: { fontSize: 13, color: '#2d6a2d', fontWeight: '600' },
   retakeBtn: { alignSelf: 'center' },
   retakeBtnText: { color: '#888', fontSize: 13 },
-  errorBanner: { backgroundColor: '#FEE2E2', padding: 12, borderRadius: 8 },
+  errorBanner: { backgroundColor: '#FEE2E2', padding: 12, borderRadius: 8, gap: 10 },
   errorText: { color: '#DC2626', fontSize: 13, lineHeight: 19 },
+  retryUploadBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 6,
+  },
+  retryUploadBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   uploadBtn: {
     backgroundColor: '#2563EB',
     borderRadius: 10,
