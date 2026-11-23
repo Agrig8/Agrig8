@@ -331,6 +331,37 @@ describe("HealthService", () => {
 
             expect(mockPrisma.processedEvent.findFirst).not.toHaveBeenCalled();
         });
+
+        // issue #86 — failureReason classification
+        it("returns failureReason: dependency_unavailable when DB is down but config is up", async () => {
+            mockPrisma.$queryRaw.mockRejectedValue(new Error("connection refused"));
+            mockRedis.ping.mockResolvedValue("PONG");
+
+            const result = await healthService.performStartupCheck();
+
+            expect(result.status).toBe("not_ready");
+            expect(result.failureReason).toBe("dependency_unavailable");
+        });
+
+        it("returns failureReason: dependency_unavailable when Redis is down but config is up", async () => {
+            mockPrisma.$queryRaw.mockResolvedValue([{ health_check: 1 }]);
+            mockRedis.ping.mockRejectedValue(new Error("connection refused"));
+
+            const result = await healthService.performStartupCheck();
+
+            expect(result.status).toBe("not_ready");
+            expect(result.failureReason).toBe("dependency_unavailable");
+        });
+
+        it("omits failureReason when status is ready", async () => {
+            mockPrisma.$queryRaw.mockResolvedValue([{ health_check: 1 }]);
+            mockRedis.ping.mockResolvedValue("PONG");
+
+            const result = await healthService.performStartupCheck();
+
+            expect(result.status).toBe("ready");
+            expect(result.failureReason).toBeUndefined();
+        });
     });
 
     // ─────────────────────────────────────────────────────────────────────────

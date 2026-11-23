@@ -103,6 +103,7 @@ export const envSchema = z.object({
 
   // Evidence / manifest retention
   EVIDENCE_MAX_BYTES: z.coerce.number().default(52428800),
+  EVIDENCE_MAX_UPLOADS_PER_ACCOUNT: z.coerce.number().int().positive().default(20),
   EVIDENCE_METADATA_RETENTION_DAYS: z.coerce.number().default(90),
   EVIDENCE_SCAN_REQUIRED: z
     .string()

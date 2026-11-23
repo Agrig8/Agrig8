@@ -8,6 +8,7 @@ import {
     EvidenceTradeNotFoundError,
     EvidenceScanError,
     EvidenceDuplicateError,
+    EvidenceQuotaExceededError,
 } from "../services/evidence.service";
 import { appLogger } from "../middleware/logger";
 import { validateRequest } from "../middleware/validateRequest";
@@ -161,6 +162,16 @@ export function createEvidenceRouter(evidenceService = new EvidenceService()) {
                 }
                 if (err instanceof EvidenceScanError || err instanceof EvidenceDuplicateError) {
                     res.status(err.status).json({ error: err.message });
+                    return;
+                }
+                if (err instanceof EvidenceQuotaExceededError) {
+                    res.setHeader("X-Retryable", "false");
+                    res.status(err.status).json({
+                        code: "EVIDENCE_QUOTA_EXCEEDED",
+                        error: err.message,
+                        remainingQuota: err.remainingQuota,
+                        retryable: false,
+                    });
                     return;
                 }
                 throw err;

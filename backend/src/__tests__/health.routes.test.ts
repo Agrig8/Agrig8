@@ -288,6 +288,74 @@ describe("Tiered Health Endpoints (Issue #224)", () => {
             expect(res.body.status).toBe("not_ready");
             expect(res.body).toHaveProperty("error");
         });
+
+        // issue #86 — failureReason distinguishes dependency vs. app failure
+        it("includes failureReason: dependency_unavailable when DB or Redis is down", async () => {
+            mockPerformStartupCheck.mockResolvedValue({
+                status: "not_ready",
+                failureReason: "dependency_unavailable",
+                timestamp: new Date().toISOString(),
+                checks: {
+                    database: { status: "down", message: "connection refused", responseTime: 200 },
+                    redis: { status: "up", message: "ok", responseTime: 3 },
+                    config: { status: "up", message: "ok", responseTime: 0 },
+                    adminSigningKey: { status: "up", message: "ok", responseTime: 1 },
+                },
+            });
+
+            const res = await request(app).get("/health/startup");
+
+            expect(res.status).toBe(503);
+            expect(res.body.status).toBe("not_ready");
+            expect(res.body.failureReason).toBe("dependency_unavailable");
+        });
+
+        it("includes failureReason: app_startup_failure when config is invalid", async () => {
+            mockPerformStartupCheck.mockResolvedValue({
+                status: "not_ready",
+                failureReason: "app_startup_failure",
+                timestamp: new Date().toISOString(),
+                checks: {
+                    database: { status: "up", message: "ok", responseTime: 5 },
+                    redis: { status: "up", message: "ok", responseTime: 3 },
+                    config: { status: "down", message: "missing ADMIN_SECRET_KEY", responseTime: 0 },
+                    adminSigningKey: { status: "up", message: "ok", responseTime: 1 },
+                },
+            });
+
+            const res = await request(app).get("/health/startup");
+
+            expect(res.status).toBe(503);
+            expect(res.body.failureReason).toBe("app_startup_failure");
+        });
+
+        it("includes failureReason: app_startup_failure when admin signing key is invalid", async () => {
+            mockPerformStartupCheck.mockResolvedValue({
+                status: "not_ready",
+                failureReason: "app_startup_failure",
+                timestamp: new Date().toISOString(),
+                checks: {
+                    database: { status: "up", message: "ok", responseTime: 5 },
+                    redis: { status: "up", message: "ok", responseTime: 3 },
+                    config: { status: "up", message: "ok", responseTime: 0 },
+                    adminSigningKey: { status: "down", message: "invalid key material", responseTime: 1 },
+                },
+            });
+
+            const res = await request(app).get("/health/startup");
+
+            expect(res.status).toBe(503);
+            expect(res.body.failureReason).toBe("app_startup_failure");
+        });
+
+        it("omits failureReason from response body when status is ready", async () => {
+            mockPerformStartupCheck.mockResolvedValue(makeStartupResult("ready"));
+
+            const res = await request(app).get("/health/startup");
+
+            expect(res.status).toBe(200);
+            expect(res.body).not.toHaveProperty("failureReason");
+        });
     });
 
     // ─────────────────────────────────────────────────────────────────────────
