@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Spinner } from "@/components/ui/Spinner";
 import { webhooksApi, AVAILABLE_EVENTS, Webhook } from "@/lib/api/webhooks";
 import { request } from "@/lib/api/client";
+import { useNetworkPreference, type StellarNetwork } from "@/hooks/useNetworkPreference";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -793,11 +794,17 @@ export default function SettingsPage() {
     quietHoursEnd: "07:00",
   });
 
+  const { network: savedNetwork, setNetwork: persistNetwork, isUnsupported: networkUnsupported } = useNetworkPreference();
   const [prefs, setPrefs] = useState<AppPrefs>({
     network: "testnet",
     currency: "USD",
     autoSignOut: "30",
   });
+
+  // Sync network from persisted storage on mount (issue #36)
+  useEffect(() => {
+    setPrefs((prev) => ({ ...prev, network: savedNetwork }));
+  }, [savedNetwork]);
 
   const [copied, setCopied] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -848,7 +855,9 @@ export default function SettingsPage() {
       return;
     }
 
-    // Preferences are local-only for now; extend with API call as needed.
+    // Persist network selection to localStorage (issue #36)
+    persistNetwork(prefs.network as StellarNetwork);
+
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2500);
   }
@@ -1046,6 +1055,11 @@ export default function SettingsPage() {
           description="Network, display currency, and session settings."
         >
           <div className="space-y-5">
+            {networkUnsupported && (
+              <div role="alert" className="rounded-lg border border-status-warning/30 bg-status-warning/10 px-4 py-3 text-sm text-status-warning">
+                <strong>Unsupported network:</strong> This deployment is configured for Testnet. Switching to Mainnet may result in failed transactions. Contact your administrator to enable Mainnet support.
+              </div>
+            )}
             <SelectField
               label="Network"
               description="The Stellar network your wallet interacts with."
