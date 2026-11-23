@@ -133,3 +133,8 @@ path = "tests/pause_metadata_tests.rs"
 [[test]]
 name = "trade_state_machine_proptest"
 path = "tests/trade_state_machine_proptest.rs"
+
+# Issue #56 — contract pause behavior
+[[test]]
+name = "pause_behavior_tests"
+path = "tests/pause_behavior_tests.rs"
