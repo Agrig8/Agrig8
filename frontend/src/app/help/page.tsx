@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import { BookOpen, ExternalLink, HelpCircle, MessageCircle, Shield, Zap } from "lucide-react";
 import { FAQ_SECTIONS, SUPPORT_EMAIL } from "./faq";
+import { routeMeta } from "@/lib/routeMetadata";
 
-export const metadata: Metadata = {
-  title: "Help & FAQ",
-  description: "Answers to common questions about fees, disputes and cNGN, and how to contact support.",
-};
+export const metadata: Metadata = routeMeta.help;
 
 const EXTERNAL_RESOURCES = [
   {

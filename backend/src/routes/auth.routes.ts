@@ -7,8 +7,8 @@ import { AuthRequest } from '../services/auth.service';
 import { RATE_LIMIT_CONFIG } from '../config/rateLimit';
 import { createIpRateLimiter } from '../lib/rateLimit';
 
-const authLimiter = createIpRateLimiter(RATE_LIMIT_CONFIG.auth);
-const refreshLimiter = createIpRateLimiter(RATE_LIMIT_CONFIG.authRefresh);
+const authLimiter = createIpRateLimiter(RATE_LIMIT_CONFIG.auth, "auth");
+const refreshLimiter = createIpRateLimiter(RATE_LIMIT_CONFIG.authRefresh, "auth_refresh");
 
 const router = Router();
 

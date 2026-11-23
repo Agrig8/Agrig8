@@ -3,6 +3,10 @@ import { NextFunction, Request, Response } from 'express';
 import { RateLimitPreset } from '../config/rateLimit';
 import { ErrorCode } from '../errors/errorCodes';
 import { AuthRequest } from '../services/auth.service';
+import {
+  recordRateLimitDecision,
+  type RateLimitRouteCategory,
+} from './metrics';
 
 /**
  * Rate limiting resilience policy: FAIL-OPEN (documented choice).
@@ -31,21 +35,21 @@ function resolveWalletAddress(req: Request): string | undefined {
   return walletAddress || undefined;
 }
 
-export function createIpRateLimiter(preset: RateLimitPreset) {
-  return createRateLimiter(preset, resolveClientIp);
+export function createIpRateLimiter(preset: RateLimitPreset, category: RateLimitRouteCategory = "other") {
+  return createRateLimiter(preset, resolveClientIp, category);
 }
 
-export function createWalletRateLimiter(preset: RateLimitPreset) {
+export function createWalletRateLimiter(preset: RateLimitPreset, category: RateLimitRouteCategory = "other") {
   return createRateLimiter(preset, (req: Request) => {
     const walletAddress = resolveWalletAddress(req);
     if (!walletAddress) {
       return resolveClientIp(req);
     }
     return `wallet:${walletAddress}`;
-  });
+  }, category);
 }
 
-function createRateLimiter(preset: RateLimitPreset, keyGenerator: KeyGenerator) {
+function createRateLimiter(preset: RateLimitPreset, keyGenerator: KeyGenerator, category: RateLimitRouteCategory = "other") {
   return rateLimit({
     windowMs: preset.windowMs,
     max: preset.max,
@@ -59,6 +63,7 @@ function createRateLimiter(preset: RateLimitPreset, keyGenerator: KeyGenerator) 
       _next: NextFunction,
       options: { message?: string | unknown; windowMs?: number; max?: number },
     ) => {
+      recordRateLimitDecision(category, "rejected");
       const retryAfterSeconds = Math.ceil((options.windowMs ?? preset.windowMs) / 1000);
       if (typeof res.setHeader === 'function') {
         res.setHeader('Retry-After', String(retryAfterSeconds));
@@ -79,7 +84,25 @@ function createRateLimiter(preset: RateLimitPreset, keyGenerator: KeyGenerator) 
     // Graceful degradation: on MemoryStore errors, fail open but log
     // If a RedisStore is ever injected, keep same fail-open contract.
     validate: false,
+    // Record accepted decisions via express-rate-limit's onLimitReached complement
+    // by hooking the skip callback: requests that pass through record "accepted".
+    skip: (req: Request, res: Response) => {
+      // skip() returning false means "do NOT skip" = apply rate limit normally.
+      // We use this solely as an observation hook; never actually skip anything.
+      void res; // suppress unused warning
+      recordRateLimitDecision(category, "accepted");
+      return false;
+    },
   });
+}
+
+/**
+ * Records a bypassed rate-limit decision for a given category.
+ * Call this from middleware that explicitly skips rate limiting (e.g. health
+ * check paths, internal service-to-service bypass headers).
+ */
+export function recordRateLimitBypassed(category: RateLimitRouteCategory): void {
+  recordRateLimitDecision(category, "bypassed");
 }
 
 /**

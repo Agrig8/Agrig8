@@ -3,6 +3,7 @@ import { Response, Router } from "express";
 import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.middleware";
 import { adminMiddleware } from "../middleware/admin.middleware";
+import { requireAdminScope } from "../middleware/adminActionScope.middleware";
 import { adminTimeoutMiddleware } from "../middleware/adminTimeout.middleware";
 import { validateRequest } from "../middleware/validateRequest";
 import { AuthRequest } from "../services/auth.service";
@@ -31,7 +32,7 @@ const updateFeeBodySchema = z.object({
   feeBps: z.number().int().min(1).max(500),
 });
 
-const adminRateLimit = createWalletRateLimiter(RATE_LIMIT_CONFIG.admin);
+const adminRateLimit = createWalletRateLimiter(RATE_LIMIT_CONFIG.admin, "admin");
 
 export function createAdminContractRouter(
   contractService: ContractService = new ContractService(),
@@ -42,6 +43,7 @@ export function createAdminContractRouter(
     "/api/admin/contract/mediators",
     authMiddleware,
     adminMiddleware,
+    requireAdminScope("write"),
     adminRateLimit,
     validateRequest({ body: addMediatorBodySchema }),
     async (req: AuthRequest, res: Response, next) => {
@@ -69,6 +71,7 @@ export function createAdminContractRouter(
     "/api/admin/contract/mediators/:address",
     authMiddleware,
     adminMiddleware,
+    requireAdminScope("write"),
     adminRateLimit,
     validateRequest({ params: mediatorAddressParamSchema }),
     async (req: AuthRequest, res: Response, next) => {
@@ -96,6 +99,7 @@ export function createAdminContractRouter(
     "/api/admin/contract/fee",
     authMiddleware,
     adminMiddleware,
+    requireAdminScope("write"),
     adminRateLimit,
     validateRequest({ body: updateFeeBodySchema }),
     async (req: AuthRequest, res: Response, next) => {

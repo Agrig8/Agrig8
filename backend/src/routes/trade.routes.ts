@@ -22,7 +22,7 @@ export function createTradeRouter(prisma: PrismaClient = defaultPrisma) {
   const router = Router();
   const tradeService = new TradeService(prisma);
   const tradeController = new TradeController(tradeService);
-  const disputeLimiter = createWalletRateLimiter(RATE_LIMIT_CONFIG.dispute);
+  const disputeLimiter = createWalletRateLimiter(RATE_LIMIT_CONFIG.dispute, "dispute");
 
   const requireWalletFromJwt = (req: AuthRequest, res: Response): string | null => {
     const addr = req.user?.walletAddress?.trim();

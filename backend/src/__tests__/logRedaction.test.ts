@@ -124,3 +124,82 @@ describe("redactPii", () => {
     expect(serialized).toContain("T-9001");
   });
 });
+
+describe("redactPii — extended denylist (issue #43)", () => {
+  it("redacts standalone address field", () => {
+    const input = { address: "123 Main St, Lagos" };
+    const result = redactPii(input);
+    expect(result.address).toBe("[REDACTED]");
+  });
+
+  it("redacts postal address variants", () => {
+    const fields = {
+      mailingAddress: "456 Elm Rd",
+      billingAddress: "789 Oak Ave",
+      shippingAddress: "1 Trade Blvd",
+      city: "Abuja",
+      state: "FCT",
+      country: "Nigeria",
+      zipCode: "90001",
+      postalCode: "12345",
+      postCode: "SW1A",
+    };
+    const result = redactPii(fields);
+    for (const key of Object.keys(fields)) {
+      expect((result as Record<string, unknown>)[key]).toBe("[REDACTED]");
+    }
+  });
+
+  it("redacts financial fields", () => {
+    const fields = {
+      bankAccount: "0012345678",
+      accountNumber: "9876543210",
+      routingNumber: "021000021",
+      iban: "GB29NWBK60161331926819",
+      bic: "NWBKGB2L",
+      swiftCode: "CITIUS33",
+    };
+    const result = redactPii(fields);
+    for (const key of Object.keys(fields)) {
+      expect((result as Record<string, unknown>)[key]).toBe("[REDACTED]");
+    }
+  });
+
+  it("redacts auth token fields", () => {
+    const fields = {
+      bearerToken: "eyJhbGciOiJIUzI1NiJ9.test",
+      xApiKey: "sk-live-secret-key",
+      csrfToken: "csrf_abc123",
+    };
+    const result = redactPii(fields);
+    for (const key of Object.keys(fields)) {
+      expect((result as Record<string, unknown>)[key]).toBe("[REDACTED]");
+    }
+  });
+
+  it("redacts name and username", () => {
+    const fields = {
+      name: "Emeka Obi",
+      username: "emeka_obi",
+    };
+    const result = redactPii(fields);
+    expect(result.name).toBe("[REDACTED]");
+    expect(result.username).toBe("[REDACTED]");
+  });
+
+  it("preserves non-PII fields alongside redacted ones", () => {
+    const input = {
+      tradeId: "T-9999",
+      address: "1 Secret Lane",
+      amount: 50000,
+      city: "Lagos",
+      status: "ACTIVE",
+    };
+    const result = redactPii(input);
+    expect(result.tradeId).toBe("T-9999");
+    expect(result.amount).toBe(50000);
+    expect(result.status).toBe("ACTIVE");
+    expect(result.address).toBe("[REDACTED]");
+    expect(result.city).toBe("[REDACTED]");
+  });
+});
