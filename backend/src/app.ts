@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import { errorHandler } from "./middleware/errorHandler";
+import { retryClassificationMiddleware } from "./middleware/retryClassification.middleware";
 import { correlationIdMiddleware } from "./middleware/correlationId.middleware";
 import { tracingMiddleware } from "./middleware/tracing.middleware";
 import loggerMiddleware, { appLogger } from "./middleware/logger";
@@ -192,6 +193,10 @@ export function createApp(isShuttingDown?: () => boolean): express.Application {
       }
     }
     if (errIdx !== -1) stack.splice(errIdx, 1);
+    // Also remove any stale retryClassification layer before re-adding the pair.
+    const retryIdx = stack.findLastIndex((l: any) => l.handle === retryClassificationMiddleware);
+    if (retryIdx !== -1) stack.splice(retryIdx, 1);
+    _originalUse(retryClassificationMiddleware);
     _originalUse(errorHandler);
   }
 
@@ -207,7 +212,8 @@ export function createApp(isShuttingDown?: () => boolean): express.Application {
     return result;
   };
 
-  // Initial registration
+  // Initial registration — retryClassification annotates before errorHandler formats.
+  app.use(retryClassificationMiddleware);
   app.use(errorHandler);
 
   return app;
