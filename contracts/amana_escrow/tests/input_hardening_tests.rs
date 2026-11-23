@@ -158,6 +158,16 @@ fn create_trade_rejects_out_of_range_seller_bps() {
         .create_trade(&h.buyer, &h.seller, &100i128, &0u32, &10_001u32, &None);
 }
 
+#[test]
+#[should_panic(expected = "loss ratios must sum to 10000 (100%)")]
+fn create_trade_rejects_loss_ratios_that_do_not_sum_to_10000() {
+    let h = H::new();
+    h.init();
+    h.tok().mint(&h.buyer, &100i128);
+    h.c()
+        .create_trade(&h.buyer, &h.seller, &100i128, &7000u32, &2000u32, &None);
+}
+
 // ---------------------------------------------------------------------------
 // initiate_dispute — reason_hash bound
 // ---------------------------------------------------------------------------
