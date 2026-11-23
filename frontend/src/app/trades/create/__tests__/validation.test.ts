@@ -73,3 +73,40 @@ describe("validateStep2", () => {
     expect(Object.keys(errors)).toEqual(expect.arrayContaining(expectedKeys));
   });
 });
+
+describe("validateStep1 — buyer address (issue #32)", () => {
+  const validSeller = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  const validBuyer  = "GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+
+  const validBase = {
+    commodity: "Maize",
+    quantity: "10",
+    unit: "kg",
+    pricePerUnit: "1500",
+    currency: "NGN",
+    sellerAddress: validSeller,
+    buyerAddress: validBuyer,
+  };
+
+  it("passes with valid distinct buyer and seller addresses", () => {
+    const errors = validateStep1(validBase);
+    expect(errors).toEqual({});
+  });
+
+  it("fails when buyerAddress is empty", () => {
+    const errors = validateStep1({ ...validBase, buyerAddress: "" });
+    expect(errors).toHaveProperty("buyerAddress");
+  });
+
+  it("fails when buyerAddress is an invalid key", () => {
+    const errors = validateStep1({ ...validBase, buyerAddress: "not-a-stellar-key" });
+    expect(errors).toHaveProperty("buyerAddress");
+  });
+
+  it("fails when buyerAddress equals sellerAddress", () => {
+    const errors = validateStep1({ ...validBase, buyerAddress: validSeller });
+    expect(errors).toHaveProperty("buyerAddress");
+    expect(errors.buyerAddress).toMatch(/different/i);
+  });
+});
+});

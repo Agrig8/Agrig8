@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
 import { NavButton } from "@/components/ui/Navigation";
 import { VirtualizedList } from "@/components/ui/VirtualizedList";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type TradeStatus = "all" | "active" | "pending" | "completed" | "disputed";
 
@@ -216,16 +217,16 @@ export default function TradesPage() {
       {!loading && !error && (
         <>
           {trades.length === 0 ? (
-            <div className="rounded-lg border border-border-default bg-surface-1 py-20 px-6 text-center shadow-elev-1">
-              {/* Icon */}
-              <div className="flex justify-center mb-6">
-                <div className="w-16 h-16 rounded-lg bg-surface-2 border border-border-default flex items-center justify-center">
+            <div className="rounded-lg border border-border-default bg-surface-1 shadow-elev-1">
+              <EmptyState
+                icon={
                   <svg
-                    className="w-8 h-8 text-text-muted"
+                    aria-hidden="true"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                     strokeWidth="1.5"
+                    style={{ width: 32, height: 32 }}
                   >
                     <path
                       strokeLinecap="round"
@@ -233,24 +234,16 @@ export default function TradesPage() {
                       d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                </div>
-              </div>
-
-              {/* Heading */}
-              <h3 className="text-xl font-semibold text-text-primary mb-3">
-                No trades yet
-              </h3>
-
-              {/* Description */}
-              <p className="text-text-secondary text-sm mb-8 max-w-sm mx-auto leading-relaxed">
-                Get started by creating your first trade to begin settling
-                agricultural transactions securely on the blockchain.
-              </p>
-
-              {/* CTA Button */}
-              <Link href="/trades/create">
-                <Button variant="primary" size="lg">Create Your First Trade</Button>
-              </Link>
+                }
+                title="No trades yet"
+                description="Get started by creating your first trade to begin settling agricultural transactions securely on the blockchain."
+                action={
+                  <Link href="/trades/create">
+                    <Button variant="primary" size="lg">Create Your First Trade</Button>
+                  </Link>
+                }
+                className="py-20"
+              />
             </div>
           ) : (
             <div className="rounded-lg border border-border-default overflow-hidden shadow-elev-1">

@@ -1,5 +1,5 @@
 import { ApiError } from "../api/client";
-import { getErrorInfo, isForbiddenError } from "../errorHandler";
+import { getErrorInfo, isForbiddenError, BackendErrorCode } from "../errorHandler";
 
 describe("isForbiddenError", () => {
   it("returns true for a plain 403 ApiError with no structured backend code", () => {
@@ -109,5 +109,38 @@ describe("getErrorInfo — admin operation error codes (#59)", () => {
 
     expect(info.title).toBe("Error 500");
     expect(info.type).toBe("error");
+  });
+});
+
+describe("getErrorInfo — Stellar/contract error codes (issue #34)", () => {
+  function makeApiError(code: string, status = 422) {
+    return new ApiError(status, code, {
+      code,
+      message: code,
+      details: {},
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  it.each<[BackendErrorCode, string, string]>([
+    [BackendErrorCode.SUBMISSION_CONTRACT_ERROR, "Contract Rejected", "error"],
+    [BackendErrorCode.SUBMISSION_NETWORK_ERROR, "Network Error", "error"],
+    [BackendErrorCode.SUBMISSION_VALIDATION_ERROR, "Invalid Transaction", "warning"],
+    [BackendErrorCode.SUBMISSION_AUTHORIZATION_ERROR, "Not Authorised", "error"],
+    [BackendErrorCode.STELLAR_INSUFFICIENT_BALANCE, "Insufficient Balance", "error"],
+    [BackendErrorCode.STELLAR_BAD_SEQUENCE, "Sequence Error", "warning"],
+    [BackendErrorCode.STELLAR_TRANSACTION_TIMING, "Transaction Expired", "warning"],
+    [BackendErrorCode.STELLAR_ACCOUNT_NOT_FOUND, "Account Not Found", "error"],
+    [BackendErrorCode.STELLAR_CONTRACT_NOT_FOUND, "Contract Not Found", "error"],
+    [BackendErrorCode.STELLAR_RATE_LIMITED, "Rate Limited", "warning"],
+    [BackendErrorCode.STELLAR_TIMEOUT, "Request Timed Out", "warning"],
+    [BackendErrorCode.STELLAR_UNKNOWN_ERROR, "Stellar Error", "error"],
+  ])("%s → title: %s, type: %s", (code, expectedTitle, expectedType) => {
+    const info = getErrorInfo(makeApiError(code));
+    expect(info.title).toBe(expectedTitle);
+    expect(info.type).toBe(expectedType);
+    // Message must not expose the raw error code to the user.
+    expect(info.message).not.toContain("STELLAR_");
+    expect(info.message).not.toContain("SUBMISSION_");
   });
 });
