@@ -152,13 +152,16 @@ export class TradeService {
         })
         : [];
 
+      const totalPages = Math.max(1, Math.ceil(total / limit));
       return {
         items: [...watchedPage, ...unwatchlisted],
         pagination: {
           page,
           limit,
           total,
-          totalPages: Math.max(1, Math.ceil(total / limit)),
+          totalPages,
+          hasMore: page < totalPages,
+          nextPage: page < totalPages ? page + 1 : null,
         },
       };
     }
@@ -173,13 +176,16 @@ export class TradeService {
       this.prisma.trade.count({ where }),
     ]);
 
+    const totalPages = Math.max(1, Math.ceil(total / limit));
     return {
       items,
       pagination: {
         page,
         limit,
         total,
-        totalPages: Math.max(1, Math.ceil(total / limit)),
+        totalPages,
+        hasMore: page < totalPages,
+        nextPage: page < totalPages ? page + 1 : null,
       },
     };
   }
