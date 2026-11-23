@@ -46,6 +46,7 @@ const STATUS_COLORS: Record<TradeStatus, string> = {
   DISPUTED: '#EF4444',
   COMPLETED: '#34D399',
   REFUNDED: '#6B7280',
+  EXPIRED: '#6B7280',
 };
 
 const STATUS_LABELS: Record<TradeStatus, string> = {
@@ -56,6 +57,7 @@ const STATUS_LABELS: Record<TradeStatus, string> = {
   DISPUTED: 'Disputed',
   COMPLETED: 'Completed',
   REFUNDED: 'Refunded',
+  EXPIRED: 'Expired',
 };
 
 type TimelineStep = {
@@ -104,6 +106,9 @@ function TradeTimeline({ trade }: { trade: Trade }) {
   if (trade.status === 'REFUNDED') {
     steps.push({ label: 'Refunded', done: true, active: true });
   }
+  if (trade.status === 'EXPIRED') {
+    steps.push({ label: 'Expired', done: true, active: true });
+  }
 
   return (
     <View style={styles.section}>
@@ -118,6 +123,51 @@ function TradeTimeline({ trade }: { trade: Trade }) {
           </Text>
         </View>
       ))}
+    </View>
+  );
+}
+
+function TradeDeadline({ expiresAt }: { expiresAt: string }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const deadlineMs = Date.parse(expiresAt);
+  if (!Number.isFinite(deadlineMs)) return null;
+
+  const remainingMs = deadlineMs - now;
+  const remainingMinutes = Math.ceil(Math.max(0, remainingMs) / 60_000);
+  const days = Math.floor(remainingMinutes / (24 * 60));
+  const hours = Math.floor((remainingMinutes % (24 * 60)) / 60);
+  const minutes = remainingMinutes % 60;
+  const countdown =
+    remainingMs <= 0
+      ? 'Deadline passed'
+      : `${days > 0 ? `${days}d ` : ''}${hours > 0 || days > 0 ? `${hours}h ` : ''}${minutes}m remaining`;
+  const localDeadline = new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  }).format(new Date(deadlineMs));
+
+  return (
+    <View style={styles.section} testID="trade-deadline">
+      <Text style={styles.sectionTitle}>Trade deadline</Text>
+      <Text style={remainingMs <= 0 ? styles.deadlineExpired : styles.deadlineCountdown}>
+        {countdown}
+      </Text>
+      <Text style={styles.deadlineDetails}>Deadline: {localDeadline}</Text>
+      <Text style={styles.deadlineDetails}>
+        {remainingMs <= 0
+          ? 'Deadline passed. Refresh the trade to check whether expiry processing has updated its status.'
+          : 'If the trade is still active at this time, the server may expire it according to its current status.'}
+      </Text>
     </View>
   );
 }
@@ -452,6 +502,13 @@ export default function TradeDetailScreen({ route, navigation, embedded = false 
           )}
         </View>
 
+        {currentTrade.expiresAt &&
+        currentTrade.status !== 'COMPLETED' &&
+        currentTrade.status !== 'REFUNDED' &&
+        currentTrade.status !== 'EXPIRED' ? (
+          <TradeDeadline expiresAt={currentTrade.expiresAt} />
+        ) : null}
+
         {/* Error banner — dual-slot display via `lastActionErrorView
             ?? errorView` above. Successful loads do NOT wipe a stale
             action banner, so we explicitly clear as needed. */}
@@ -691,6 +748,9 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 13, fontWeight: '700' },
   amountText: { fontSize: 28, fontWeight: '800', color: '#1a3a1a' },
   commodityText: { fontSize: 14, color: '#555', marginTop: 4 },
+  deadlineCountdown: { fontSize: 18, fontWeight: '700', color: '#1a3a1a' },
+  deadlineExpired: { fontSize: 18, fontWeight: '700', color: '#b91c1c' },
+  deadlineDetails: { fontSize: 12, color: '#666' },
   bannerWrap: { paddingHorizontal: 0 },
   section: {
     backgroundColor: '#fff',

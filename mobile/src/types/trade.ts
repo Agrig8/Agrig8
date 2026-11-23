@@ -5,7 +5,8 @@ export type TradeStatus =
   | 'DELIVERED'
   | 'DISPUTED'
   | 'COMPLETED'
-  | 'REFUNDED';
+  | 'REFUNDED'
+  | 'EXPIRED';
 
 export interface Trade {
   id: number;
@@ -16,6 +17,7 @@ export interface Trade {
   status: TradeStatus;
   createdAt?: string;
   updatedAt?: string;
+  expiresAt?: string | null;
   buyerLossBps?: number;
   sellerLossBps?: number;
   commodity?: string;

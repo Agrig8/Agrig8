@@ -16,13 +16,17 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   generate-sbom:
     if: github.event_name == 'release' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     name: Generate SBOM (${{ matrix.component }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     strategy:
       matrix:
         component: [backend, frontend, mobile]
@@ -41,6 +45,11 @@ jobs:
             --output-format json \
             --output-file "sbom-${{ matrix.component }}.cdx.json" \
             "${{ matrix.component }}/package.json"
+
+      - name: Attest SBOM provenance
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
+        with:
+          subject-path: "sbom-${{ matrix.component }}.cdx.json"
 
       - name: Upload SBOM as workflow artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
@@ -61,6 +70,8 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Weekly SBOM Vulnerability Diff
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4

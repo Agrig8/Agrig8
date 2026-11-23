@@ -46,6 +46,7 @@ const STATUS_COLORS: Record<TradeStatus, string> = {
   DISPUTED: '#EF4444',
   COMPLETED: '#34D399',
   REFUNDED: '#6B7280',
+  EXPIRED: '#6B7280',
 };
 
 // Labels must match web StatusBadge copy verbatim (issue #249).
@@ -57,6 +58,7 @@ const STATUS_LABELS: Record<TradeStatus, string> = {
   DISPUTED: 'Disputed',
   COMPLETED: 'Completed',
   REFUNDED: 'Refunded',
+  EXPIRED: 'Expired',
 };
 
 function TradeCard({

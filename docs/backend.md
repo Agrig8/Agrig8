@@ -173,7 +173,7 @@ Mutation endpoints support idempotency via the `Idempotency-Key` header.
 
 - Manifest and evidence metadata now enforce retention windows on read:
   - stale evidence metadata is redacted (`cid`, `filename`, selective actor details)
-  - stale manifest seller PII is redacted to `REDACTED` while preserving hashes
+  - stale manifest seller PII fields are redacted to `REDACTED` while preserving hashes
 - Audit history metadata is minimized for non-admin callers:
   - vehicle registrations are masked
   - expired evidence metadata is redacted and tagged with `retentionExpired`

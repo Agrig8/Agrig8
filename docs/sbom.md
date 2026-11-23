@@ -44,3 +44,16 @@ You can generate an SBOM locally without waiting for CI:
 ```bash
 npx @cyclonedx/cyclonedx-npm --output-format json --output-file sbom-backend.cdx.json backend/package.json
 ```
+
+## 6. Release provenance
+
+The release workflow creates a GitHub build-provenance attestation for each
+generated SBOM using GitHub's OIDC-backed attestation service. The attestation
+binds the SBOM to the workflow run and repository revision; it is separate from
+the SBOM file attached to the release.
+
+Verify a downloaded SBOM against this repository with GitHub CLI:
+
+```bash
+gh attestation verify sbom-backend.cdx.json --repo Agrig8/Agrig8
+```
