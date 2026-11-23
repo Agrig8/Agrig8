@@ -404,7 +404,24 @@ This document is **not static**. It is reviewed on the following schedule so tha
 
 ### Changelog
 
-| Date | Reviewer | Summary |
-|---|---|---|
-| 2026-08-26 | `@Ndifreke000` | First formal quarterly-cadence review. Established owner, cadence, trigger conditions, and this changelog per issue #210. No control status changes from §4; matrix and priority ranking confirmed current as of this date. |
-| 2026-10-19 | `@security` | Trigger-based review for Issue #290: Per-asset pausable circuit breaker. Added TH-E-05, documented pause_asset/unpause_asset guardian authorization, updated §4 controls. |
+The changelog now records five fields per entry so that reviewers and auditors can quickly trace what changed, who signed off, and what residual exposure was accepted.
+
+| Date | Reviewer | Trigger | Findings / Changes | Residual Risk Notes |
+|---|---|---|---|---|
+| 2026-08-26 | `@Ndifreke000` | Quarterly (Q3-2026) | First formal review. Established owner, cadence, trigger conditions, and this changelog per issue #210. No control status changes in §4; matrix and priority ranking confirmed current. | No new residual risks accepted. Existing ❌ items in §4 remain as accepted gaps pending roadmap items. |
+| 2026-10-19 | `@security` | Trigger — Issue #290 (per-asset circuit breaker) | Added TH-E-05; documented pause_asset/unpause_asset guardian authorization; updated §4 controls. | Residual: guardian key compromise could freeze all assets. Mitigated by multisig requirement on guardian operations (see TH-I-01). |
+
+---
+
+## 9. Residual Risk Register
+
+This register tracks open risks that have been explicitly reviewed and accepted (or deferred) rather than mitigated. Each entry must reference the threat ID from §3 and be re-evaluated every quarter or on the relevant trigger event.
+
+| Risk ID | Threat Ref | Description | Accepted By | Accepted Date | Re-evaluate By | Status |
+|---|---|---|---|---|---|---|
+| RR-01 | TH-E-01 | No dispute bond implemented; griefing via dispute spam remains a viable attack until bonding is added. | `@Ndifreke000` | 2026-08-26 | 2027-01-01 | Open — roadmap item |
+| RR-02 | TH-I-01 | Admin key is single-sig; multisig governance is deferred until DAO tooling matures on Soroban. | `@Ndifreke000` | 2026-08-26 | 2027-01-01 | Open — roadmap item |
+| RR-03 | TH-D-01 | Evidence IPFS pinning to a dedicated provider is not yet operational; CID availability depends on user-run nodes. | `@Ndifreke000` | 2026-08-26 | 2026-11-01 | Open — operational dependency |
+| RR-04 | TH-A-02 | JWT revocation list is not implemented; compromised tokens remain valid until TTL expiry (max 1 hour). Short TTL accepted as the primary control. | `@security` | 2026-10-19 | 2027-01-01 | Open — engineering backlog |
+
+**Instructions for new entries:** copy the last row, increment the Risk ID, fill in all fields, and add a matching changelog entry in §8. Entries may be closed (status = "Closed — mitigated" or "Closed — accepted as permanent") but must never be deleted, to preserve the audit trail.

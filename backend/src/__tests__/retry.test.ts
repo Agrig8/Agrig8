@@ -610,6 +610,212 @@ describe("chaos injection — injected failure recovery", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Supabase retry matrix (issue #82)
+// Documents and tests retry behaviour for every Supabase/Postgres failure class
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Supabase retry matrix (issue #82)", () => {
+  // ---------------------------------------------------------------------------
+  // Transient failures — should be retried automatically
+  // ---------------------------------------------------------------------------
+  describe("transient failures — retried", () => {
+    it.each([
+      ["PGRST301", "upstream resource unavailable"],
+      ["57P01",    "admin_shutdown"],
+      ["57P02",    "crash_shutdown"],
+      ["57P03",    "cannot_connect_now (standby recovering)"],
+      ["08006",    "connection failure"],
+      ["08001",    "unable to establish connection"],
+    ])("retries on Supabase code %s (%s)", async (code) => {
+      const err = makeSupabaseError(code);
+      const op = jest.fn()
+        .mockRejectedValueOnce(err)
+        .mockResolvedValueOnce("ok");
+
+      const result = await retryAsync(op, { maxRetries: 1, operationName: "sb_transient" });
+      expect(result).toBe("ok");
+      expect(op).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Serialization / concurrency failures — safe to retry
+  // ---------------------------------------------------------------------------
+  describe("concurrency failures — retried", () => {
+    it("retries on 40001 (serialization_failure)", async () => {
+      const err = makeSupabaseError("40001");
+      const op = jest.fn()
+        .mockRejectedValueOnce(err)
+        .mockResolvedValueOnce("committed");
+
+      const result = await retryAsync(op, { maxRetries: 1, operationName: "sb_serialization" });
+      expect(result).toBe("committed");
+      expect(op).toHaveBeenCalledTimes(2);
+    });
+
+    it("retries on 40P01 (deadlock_detected)", async () => {
+      const err = makeSupabaseError("40P01");
+      const op = jest.fn()
+        .mockRejectedValueOnce(err)
+        .mockResolvedValueOnce("committed");
+
+      const result = await retryAsync(op, { maxRetries: 1, operationName: "sb_deadlock" });
+      expect(result).toBe("committed");
+      expect(op).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Timeout failures — retried via HTTP 504
+  // ---------------------------------------------------------------------------
+  describe("timeout failures — retried", () => {
+    it("retries when Supabase returns HTTP 504 (gateway timeout)", async () => {
+      const err = makeHttpError(504);
+      const op = jest.fn()
+        .mockRejectedValueOnce(err)
+        .mockResolvedValueOnce("data");
+
+      const result = await retryAsync(op, { maxRetries: 1, operationName: "sb_timeout" });
+      expect(result).toBe("data");
+      expect(op).toHaveBeenCalledTimes(2);
+    });
+
+    it("exhausts all retries when every attempt times out", async () => {
+      const err = makeHttpError(504);
+      const op = jest.fn().mockRejectedValue(err);
+
+      await expect(
+        retryAsync(op, { maxRetries: 3, operationName: "sb_timeout_exhaust" }),
+      ).rejects.toMatchObject({ status: 504 });
+      expect(op).toHaveBeenCalledTimes(4); // 1 initial + 3 retries
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Conflict failures (409) — NOT retried (application must resolve)
+  // ---------------------------------------------------------------------------
+  describe("conflict failures — NOT retried", () => {
+    it("does NOT retry on HTTP 409 (Conflict)", async () => {
+      const err = makeHttpError(409);
+      const op = jest.fn().mockRejectedValue(err);
+
+      await expect(
+        retryAsync(op, { maxRetries: 3, operationName: "sb_conflict" }),
+      ).rejects.toMatchObject({ status: 409 });
+      // Operation called exactly once — no retries on a client error
+      expect(op).toHaveBeenCalledTimes(1);
+    });
+
+    it("does NOT retry on HTTP 422 (Unprocessable Entity)", async () => {
+      const err = makeHttpError(422);
+      const op = jest.fn().mockRejectedValue(err);
+
+      await expect(
+        retryAsync(op, { maxRetries: 3, operationName: "sb_validation" }),
+      ).rejects.toMatchObject({ status: 422 });
+      expect(op).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Permanent failures (auth/not-found) — NOT retried
+  // ---------------------------------------------------------------------------
+  describe("permanent failures — NOT retried", () => {
+    it("does NOT retry on HTTP 401 (Unauthorized)", async () => {
+      const err = makeHttpError(401);
+      const op = jest.fn().mockRejectedValue(err);
+
+      await expect(
+        retryAsync(op, { maxRetries: 3, operationName: "sb_auth" }),
+      ).rejects.toMatchObject({ status: 401 });
+      expect(op).toHaveBeenCalledTimes(1);
+    });
+
+    it("does NOT retry on HTTP 403 (Forbidden / RLS violation)", async () => {
+      const err = makeHttpError(403);
+      const op = jest.fn().mockRejectedValue(err);
+
+      await expect(
+        retryAsync(op, { maxRetries: 3, operationName: "sb_rls" }),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(op).toHaveBeenCalledTimes(1);
+    });
+
+    it("does NOT retry on HTTP 404 (row not found)", async () => {
+      const err = makeHttpError(404);
+      const op = jest.fn().mockRejectedValue(err);
+
+      await expect(
+        retryAsync(op, { maxRetries: 3, operationName: "sb_notfound" }),
+      ).rejects.toMatchObject({ status: 404 });
+      expect(op).toHaveBeenCalledTimes(1);
+    });
+
+    it("does NOT retry on PGRST116 (no rows returned — not retryable)", async () => {
+      const err = makeSupabaseError("PGRST116", "JSON object requested, multiple (or no) rows returned");
+      const op = jest.fn().mockRejectedValue(err);
+
+      await expect(
+        retryAsync(op, { maxRetries: 3, operationName: "sb_no_rows" }),
+      ).rejects.toThrow("no rows");
+      // PGRST116 is not in RETRYABLE_SUPABASE_CODES — classified as non-retryable
+      expect(op).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Two interleaved reads in the same store instance (concurrency)
+  // Simulates two concurrent optimistic updates where the first retries and
+  // succeeds while the second hits a permanent error without retrying.
+  // ---------------------------------------------------------------------------
+  describe("interleaved concurrent operations", () => {
+    it("two concurrent serialization failures — both retry independently", async () => {
+      const serializationErr = makeSupabaseError("40001");
+      const opA = jest.fn()
+        .mockRejectedValueOnce(serializationErr)
+        .mockResolvedValueOnce("A-committed");
+      const opB = jest.fn()
+        .mockRejectedValueOnce(serializationErr)
+        .mockResolvedValueOnce("B-committed");
+
+      const [a, b] = await Promise.all([
+        retryAsync(opA, { maxRetries: 1, operationName: "sb_concurrent_a" }),
+        retryAsync(opB, { maxRetries: 1, operationName: "sb_concurrent_b" }),
+      ]);
+
+      expect(a).toBe("A-committed");
+      expect(b).toBe("B-committed");
+      expect(opA).toHaveBeenCalledTimes(2);
+      expect(opB).toHaveBeenCalledTimes(2);
+    });
+
+    it("one retry succeeds, one permanent error — no cross-contamination", async () => {
+      const transientErr = makeSupabaseError("40P01");
+      const permanentErr = makeHttpError(403);
+
+      const opRetry = jest.fn()
+        .mockRejectedValueOnce(transientErr)
+        .mockResolvedValueOnce("retried-ok");
+      const opFail = jest.fn().mockRejectedValue(permanentErr);
+
+      const [retryResult, failResult] = await Promise.allSettled([
+        retryAsync(opRetry, { maxRetries: 1, operationName: "sb_concurrent_retry" }),
+        retryAsync(opFail,  { maxRetries: 3, operationName: "sb_concurrent_perm" }),
+      ]);
+
+      expect(retryResult.status).toBe("fulfilled");
+      expect((retryResult as PromiseFulfilledResult<string>).value).toBe("retried-ok");
+
+      expect(failResult.status).toBe("rejected");
+      expect((failResult as PromiseRejectedResult).reason).toMatchObject({ status: 403 });
+
+      // permanent error must not have been retried
+      expect(opFail).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Backwards compatibility
 // ─────────────────────────────────────────────────────────────────────────────
 
