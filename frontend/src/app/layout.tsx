@@ -1,6 +1,7 @@
 // src/app/layout.tsx
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
+import { siteMetadata } from "@/lib/routeMetadata";
 
 import "./globals.css";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -31,8 +32,8 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "innov8 — Secure Agricultural Escrow",
-  description: "Blockchain-powered agricultural trade settlement",
+  title: siteMetadata.title,
+  description: siteMetadata.description,
   manifest: "/manifest.json",
   themeColor: "#1a3a1a",
   appleWebApp: {

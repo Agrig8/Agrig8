@@ -4,7 +4,7 @@ import { getMe, updateMe, patchMe, getUserByAddress } from "../controllers/user.
 import { RATE_LIMIT_CONFIG } from "../config/rateLimit";
 import { createWalletRateLimiter } from "../lib/rateLimit";
 
-const limiter = createWalletRateLimiter(RATE_LIMIT_CONFIG.user);
+const limiter = createWalletRateLimiter(RATE_LIMIT_CONFIG.user, "user");
 
 const router = Router();
 

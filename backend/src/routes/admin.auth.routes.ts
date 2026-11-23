@@ -17,7 +17,7 @@ function toIso(seconds: number | undefined): string | null {
     : null;
 }
 
-const adminRateLimit = createWalletRateLimiter(RATE_LIMIT_CONFIG.admin);
+const adminRateLimit = createWalletRateLimiter(RATE_LIMIT_CONFIG.admin, "admin");
 
 export function createAdminAuthRouter(): Router {
   const router = Router();

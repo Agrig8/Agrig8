@@ -19,7 +19,7 @@ function parseStringQueryParam(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
-const adminRateLimit = createWalletRateLimiter(RATE_LIMIT_CONFIG.admin);
+const adminRateLimit = createWalletRateLimiter(RATE_LIMIT_CONFIG.admin, "admin");
 
 export function createAdminAuditRouter(): Router {
   const router = Router();

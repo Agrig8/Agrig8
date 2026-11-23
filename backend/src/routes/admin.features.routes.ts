@@ -26,7 +26,7 @@ const updateFlagBodySchema = z.object({
   value: z.number().finite().min(0).optional(),
 });
 
-const adminRateLimit = createWalletRateLimiter(RATE_LIMIT_CONFIG.admin);
+const adminRateLimit = createWalletRateLimiter(RATE_LIMIT_CONFIG.admin, "admin");
 
 export function createAdminFeaturesRouter() {
   const router = Router();

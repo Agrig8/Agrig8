@@ -9,7 +9,7 @@ import { AuthRequest } from "../services/auth.service";
 import { createWalletRateLimiter } from "../lib/rateLimit";
 import { RATE_LIMIT_CONFIG } from "../config/rateLimit";
 
-const tradeExportLimiter = createWalletRateLimiter(RATE_LIMIT_CONFIG.tradeExport);
+const tradeExportLimiter = createWalletRateLimiter(RATE_LIMIT_CONFIG.tradeExport, "trade_export");
 
 const exportQuerySchema = z.object({
   format: z.enum(["csv", "json"]).default("json"),

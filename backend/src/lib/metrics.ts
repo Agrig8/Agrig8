@@ -791,3 +791,71 @@ export function __resetTradeExpiryMetricsForTests(): void {
   tradeExpiryTradesCounter = undefined;
   tradeExpiryDuration = undefined;
 }
+
+// ---------------------------------------------------------------------------
+// Rate-limit metrics (issue #48)
+// ---------------------------------------------------------------------------
+
+/**
+ * Decision recorded for each request that passes through a rate limiter.
+ *  - accepted  : request was under the limit and allowed through.
+ *  - rejected  : request exceeded the limit and was blocked (429).
+ *  - bypassed  : rate limiting was skipped for this request (e.g. health check
+ *                paths, internal service-to-service calls that carry a bypass
+ *                header, or fail-open during store unavailability).
+ */
+export type RateLimitDecision = "accepted" | "rejected" | "bypassed";
+
+/**
+ * Broad route category labels used as the `route_category` metric dimension.
+ * Keep the cardinality low — do NOT use per-route paths here.
+ */
+export type RateLimitRouteCategory =
+  | "auth"
+  | "auth_refresh"
+  | "trade"
+  | "user"
+  | "dispute"
+  | "admin"
+  | "evidence_upload"
+  | "trade_export"
+  | "batch_query"
+  | "webhook"
+  | "other";
+
+export interface RateLimitMetricsRecorder {
+  record(category: RateLimitRouteCategory, decision: RateLimitDecision): void;
+}
+
+let rateLimitCounter: Counter | undefined;
+let rateLimitCustomRecorder: RateLimitMetricsRecorder | null = null;
+
+function getRateLimitCounter(): Counter {
+  if (!rateLimitCounter) {
+    rateLimitCounter = getMeter().createCounter("api_rate_limit_decisions_total", {
+      description:
+        "Total rate-limit decisions by route category and decision (accepted/rejected/bypassed).",
+    });
+  }
+  return rateLimitCounter;
+}
+
+export function recordRateLimitDecision(
+  category: RateLimitRouteCategory,
+  decision: RateLimitDecision,
+): void {
+  if (rateLimitCustomRecorder) {
+    rateLimitCustomRecorder.record(category, decision);
+    return;
+  }
+  getRateLimitCounter().add(1, { route_category: category, decision });
+}
+
+export function __setRateLimitRecorderForTests(recorder: RateLimitMetricsRecorder | null): void {
+  rateLimitCustomRecorder = recorder;
+}
+
+export function __resetRateLimitMetricsForTests(): void {
+  rateLimitCustomRecorder = null;
+  rateLimitCounter = undefined;
+}
