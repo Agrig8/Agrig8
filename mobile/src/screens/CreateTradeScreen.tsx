@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
@@ -123,6 +124,11 @@ function Step1Details({
   const errors = touched ? validateStep1Fields(data) : {};
   const valid = Object.keys(validateStep1Fields(data)).length === 0;
 
+  // Refs for focus-chain keyboard navigation (issue #69)
+  const qtyRef = useRef<TextInput>(null);
+  const priceRef = useRef<TextInput>(null);
+  const sellerRef = useRef<TextInput>(null);
+
   const handleNext = () => {
     setTouched(true);
     if (valid) onNext();
@@ -152,11 +158,15 @@ function Step1Details({
         <View style={[stepStyles.field, { flex: 2 }]}>
           <Text style={stepStyles.label}>Quantity</Text>
           <TextInput
+            ref={qtyRef}
             style={[stepStyles.input, errors.quantity ? stepStyles.inputError : null]}
             keyboardType="numeric"
+            returnKeyType="next"
             placeholder="e.g. 500"
             value={data.quantity}
             onChangeText={(v) => update({ quantity: v })}
+            onSubmitEditing={() => priceRef.current?.focus()}
+            blurOnSubmit={false}
           />
           <FieldError msg={errors.quantity} />
         </View>
@@ -179,11 +189,15 @@ function Step1Details({
       <View style={stepStyles.field}>
         <Text style={stepStyles.label}>Price per unit (NGN)</Text>
         <TextInput
+          ref={priceRef}
           style={[stepStyles.input, errors.pricePerUnit ? stepStyles.inputError : null]}
           keyboardType="numeric"
+          returnKeyType="next"
           placeholder="e.g. 450"
           value={data.pricePerUnit}
           onChangeText={(v) => update({ pricePerUnit: v })}
+          onSubmitEditing={() => sellerRef.current?.focus()}
+          blurOnSubmit={false}
         />
         <FieldError msg={errors.pricePerUnit} />
       </View>
@@ -196,12 +210,16 @@ function Step1Details({
       <View style={stepStyles.field}>
         <Text style={stepStyles.label}>Seller Stellar Address</Text>
         <TextInput
+          ref={sellerRef}
           style={[stepStyles.input, errors.sellerAddress ? stepStyles.inputError : null]}
           autoCapitalize="none"
           autoCorrect={false}
+          keyboardType="default"
+          returnKeyType="done"
           placeholder="G..."
           value={data.sellerAddress}
           onChangeText={(v) => update({ sellerAddress: v })}
+          onSubmitEditing={handleNext}
         />
         <FieldError msg={errors.sellerAddress} />
       </View>
@@ -226,6 +244,7 @@ function Step2Negotiation({
 }) {
   const [touched, setTouched] = useState(false);
   const errors = touched ? validateStep2Fields(data) : {};
+  const deliveryRef = useRef<TextInput>(null);
 
   const handleNext = () => {
     setTouched(true);
@@ -269,11 +288,14 @@ function Step2Negotiation({
       <View style={stepStyles.field}>
         <Text style={stepStyles.label}>Delivery Window (days, 1–90)</Text>
         <TextInput
+          ref={deliveryRef}
           style={[stepStyles.input, errors.deliveryDays ? stepStyles.inputError : null]}
           keyboardType="numeric"
+          returnKeyType="done"
           placeholder="7"
           value={data.deliveryDays}
           onChangeText={(v) => update({ deliveryDays: v })}
+          onSubmitEditing={handleNext}
         />
         <FieldError msg={errors.deliveryDays} />
       </View>
@@ -359,6 +381,46 @@ function ReviewRow({ label, value, mono }: { label: string; value: string; mono?
   );
 }
 
+const DRAFT_KEY = 'create_trade_draft_v1';
+
+/** Non-sensitive fields that survive an app restart (issue #70). */
+const DRAFT_SAFE_FIELDS: (keyof FormData)[] = [
+  'commodity',
+  'quantity',
+  'unit',
+  'buyerRatio',
+  'sellerRatio',
+  'deliveryDays',
+];
+
+async function saveDraft(data: FormData): Promise<void> {
+  try {
+    const draft: Partial<FormData> = {};
+    for (const k of DRAFT_SAFE_FIELDS) (draft as Record<string, unknown>)[k] = data[k];
+    await SecureStore.setItemAsync(DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // ignore storage errors — draft is best-effort
+  }
+}
+
+async function loadDraft(): Promise<Partial<FormData> | null> {
+  try {
+    const raw = await SecureStore.getItemAsync(DRAFT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as Partial<FormData>;
+  } catch {
+    return null;
+  }
+}
+
+async function clearDraft(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(DRAFT_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export default function CreateTradeScreen({ navigation }: Props) {
   const { contentStyle } = useResponsiveLayout();
   const insets = useSafeAreaInsets();
@@ -369,8 +431,20 @@ export default function CreateTradeScreen({ navigation }: Props) {
   const queueTrade = usePendingTradeStore((s) => s.queue);
   const { isOffline } = useNetworkStatus();
 
+  // Load saved draft on first mount (issue #70)
+  useEffect(() => {
+    loadDraft().then((draft) => {
+      if (draft) setData((prev) => ({ ...prev, ...draft }));
+    });
+  }, []);
+
   const update = useCallback((partial: Partial<FormData>) => {
-    setData((prev) => ({ ...prev, ...partial }));
+    setData((prev) => {
+      const next = { ...prev, ...partial };
+      // sellerAddress is excluded from DRAFT_SAFE_FIELDS — it is PII
+      saveDraft(next);
+      return next;
+    });
   }, []);
 
   const handleSubmit = async () => {
@@ -394,6 +468,7 @@ export default function CreateTradeScreen({ navigation }: Props) {
       // connectivity returns (issue #268).
       if (isOffline) {
         await queueTrade(payload);
+        await clearDraft();
         Alert.alert(
           'Saved Offline',
           "You're offline. This trade has been saved and will be created automatically when you reconnect."
@@ -405,6 +480,7 @@ export default function CreateTradeScreen({ navigation }: Props) {
       const result = await createTrade(payload);
 
       if (result) {
+        await clearDraft();
         Alert.alert('Trade Created', `Trade ${result.tradeId} has been created. Sign the transaction with your wallet to deposit funds.`);
         navigation.replace('TradeDetail', { tradeId: result.tradeId });
       } else {
