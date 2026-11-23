@@ -28,6 +28,10 @@ This folder is the user-facing interface for buyers, sellers, and mediators inte
 - Stellar wallet integration via Freighter
 - Privacy-first analytics instrumentation
 
+## Trade History Accessibility
+
+Trade history tables should use captions and scoped column or row headers so assistive technology can identify the data. On narrow screens, provide an accessible alternative that keeps all trade information available without requiring horizontal scrolling.
+
 ## Getting Started
 
 ### Prerequisites
