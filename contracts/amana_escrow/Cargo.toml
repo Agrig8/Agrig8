@@ -133,3 +133,8 @@ path = "tests/pause_metadata_tests.rs"
 [[test]]
 name = "trade_state_machine_proptest"
 path = "tests/trade_state_machine_proptest.rs"
+
+# Issue #51 — role transition invariant tests
+[[test]]
+name = "role_transition_invariant_tests"
+path = "tests/role_transition_invariant_tests.rs"
