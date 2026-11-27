@@ -557,11 +557,21 @@ export class HealthService {
   }
 
   /**
-   * Perform startup readiness check
-   * Checks critical dependencies needed for the application to start
+   * Perform startup readiness check.
+   *
+   * Distinguishes two not-ready categories so k8s and operators can react
+   * differently:
+   *
+   *   "dependency_unavailable" — a transient infrastructure failure (DB or
+   *     Redis unreachable). The container should be retried; it is not broken.
+   *
+   *   "app_startup_failure" — a misconfiguration that cannot recover without a
+   *     redeploy (missing env vars, invalid admin signing key). The container
+   *     should NOT be restarted automatically; operator action is required.
    */
   async performStartupCheck(): Promise<{
     status: "ready" | "not_ready";
+    failureReason?: "dependency_unavailable" | "app_startup_failure";
     timestamp: string;
     checks: Record<string, HealthIndicatorResult>;
   }> {
@@ -581,10 +591,26 @@ export class HealthService {
       adminSigningKey: adminKeyCheck,
     };
 
-    const status = databaseCheck.status === "up" && redisCheck.status === "up" && configCheck.status === "up" && adminKeyCheck.status === "up"
-      ? "ready"
-      : "not_ready";
+    const allUp =
+      databaseCheck.status === "up" &&
+      redisCheck.status === "up" &&
+      configCheck.status === "up" &&
+      adminKeyCheck.status === "up";
 
-    return { status, timestamp, checks };
+    if (allUp) {
+      return { status: "ready", timestamp, checks };
+    }
+
+    // Config or admin-key failures are misconfigurations — flag them as
+    // app_startup_failure so the operator knows a redeploy is needed.
+    const isAppFailure =
+      configCheck.status === "down" || adminKeyCheck.status === "down";
+
+    return {
+      status: "not_ready",
+      failureReason: isAppFailure ? "app_startup_failure" : "dependency_unavailable",
+      timestamp,
+      checks,
+    };
   }
 }

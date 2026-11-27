@@ -45,6 +45,17 @@ export class EvidenceScanError extends Error {
     }
 }
 
+export class EvidenceQuotaExceededError extends Error {
+    status = 429;
+    retryable = true;
+    remainingQuota: number;
+    constructor(remainingQuota = 0, message = "Evidence upload quota exceeded for this account") {
+        super(message);
+        this.name = "EvidenceQuotaExceededError";
+        this.remainingQuota = remainingQuota;
+    }
+}
+
 export interface EvidenceScanResult {
     clean: boolean;
     reason?: string;
@@ -147,6 +158,15 @@ export class EvidenceService {
             trade.sellerAddress.toLowerCase() !== caller
         ) {
             throw new EvidenceAccessDeniedError();
+        }
+
+        // Per-account upload quota — abuse limit (issue #78).
+        const maxUploads = env.EVIDENCE_MAX_UPLOADS_PER_ACCOUNT;
+        const uploadCount = await this.prisma.evidence.count({
+            where: { uploaderAddress: callerAddress },
+        });
+        if (uploadCount >= maxUploads) {
+            throw new EvidenceQuotaExceededError(0, `Evidence upload quota exceeded: ${uploadCount}/${maxUploads} uploads used`);
         }
 
         // Validate declared mime type

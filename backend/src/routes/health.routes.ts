@@ -124,6 +124,7 @@ export function createHealthRouter(isShuttingDown?: () => boolean): Router {
             const statusCode = startupCheck.status === "ready" ? 200 : 503;
             res.status(statusCode).json({
                 status: startupCheck.status,
+                ...(startupCheck.failureReason && { failureReason: startupCheck.failureReason }),
                 timestamp: startupCheck.timestamp,
                 checks: startupCheck.checks,
             });

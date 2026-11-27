@@ -791,3 +791,120 @@ export function __resetTradeExpiryMetricsForTests(): void {
   tradeExpiryTradesCounter = undefined;
   tradeExpiryDuration = undefined;
 }
+
+// ---------------------------------------------------------------------------
+// Stellar RPC fallback metrics (issue #83)
+// ---------------------------------------------------------------------------
+
+/**
+ * Which RPC provider handled the call.
+ *  - "primary"  : the primary STELLAR_RPC_URL endpoint.
+ *  - "fallback" : a secondary endpoint used after primary failed or was slow.
+ */
+export type RpcProviderSelection = "primary" | "fallback";
+
+/**
+ * Why a fallback was triggered.
+ *  - "primary_error"   : primary returned an error response.
+ *  - "primary_timeout" : primary did not respond in time.
+ *  - "circuit_open"    : circuit breaker was open for the primary.
+ *  - none (omitted)    : primary was used successfully.
+ */
+export type RpcFallbackReason = "primary_error" | "primary_timeout" | "circuit_open";
+
+export interface RpcFallbackMetricsRecorder {
+  recordProviderSelection(provider: RpcProviderSelection, endpoint: string, latencyMs: number): void;
+  recordFallback(reason: RpcFallbackReason, primaryEndpoint: string, fallbackEndpoint: string): void;
+  recordProviderFailureRate(provider: RpcProviderSelection, endpoint: string, failed: boolean): void;
+}
+
+let rpcProviderCounter: Counter | undefined;
+let rpcProviderLatency: Histogram | undefined;
+let rpcFallbackCounter: Counter | undefined;
+let rpcFailureRateCounter: Counter | undefined;
+let rpcFallbackCustomRecorder: RpcFallbackMetricsRecorder | null = null;
+
+function getRpcProviderCounter(): Counter {
+  if (!rpcProviderCounter) {
+    rpcProviderCounter = getMeter().createCounter("stellar_rpc_provider_selections_total", {
+      description: "Total Stellar RPC calls broken down by provider (primary vs. fallback).",
+    });
+  }
+  return rpcProviderCounter;
+}
+
+function getRpcProviderLatency(): Histogram {
+  if (!rpcProviderLatency) {
+    rpcProviderLatency = getMeter().createHistogram("stellar_rpc_provider_latency_ms", {
+      description: "Per-provider Stellar RPC call latency in milliseconds.",
+      unit: "ms",
+    });
+  }
+  return rpcProviderLatency;
+}
+
+function getRpcFallbackCounter(): Counter {
+  if (!rpcFallbackCounter) {
+    rpcFallbackCounter = getMeter().createCounter("stellar_rpc_fallbacks_total", {
+      description: "Total times the Stellar RPC client fell back to a secondary provider.",
+    });
+  }
+  return rpcFallbackCounter;
+}
+
+function getRpcFailureRateCounter(): Counter {
+  if (!rpcFailureRateCounter) {
+    rpcFailureRateCounter = getMeter().createCounter("stellar_rpc_provider_failures_total", {
+      description: "Total failed Stellar RPC calls per provider, for failure rate computation.",
+    });
+  }
+  return rpcFailureRateCounter;
+}
+
+export function recordRpcProviderSelection(
+  provider: RpcProviderSelection,
+  endpoint: string,
+  latencyMs: number,
+): void {
+  if (rpcFallbackCustomRecorder) {
+    rpcFallbackCustomRecorder.recordProviderSelection(provider, endpoint, latencyMs);
+    return;
+  }
+  getRpcProviderCounter().add(1, { provider, endpoint });
+  getRpcProviderLatency().record(latencyMs, { provider, endpoint });
+}
+
+export function recordRpcFallback(
+  reason: RpcFallbackReason,
+  primaryEndpoint: string,
+  fallbackEndpoint: string,
+): void {
+  if (rpcFallbackCustomRecorder) {
+    rpcFallbackCustomRecorder.recordFallback(reason, primaryEndpoint, fallbackEndpoint);
+    return;
+  }
+  getRpcFallbackCounter().add(1, { reason, primary_endpoint: primaryEndpoint, fallback_endpoint: fallbackEndpoint });
+}
+
+export function recordRpcProviderFailure(
+  provider: RpcProviderSelection,
+  endpoint: string,
+): void {
+  if (rpcFallbackCustomRecorder) {
+    rpcFallbackCustomRecorder.recordProviderFailureRate(provider, endpoint, true);
+    return;
+  }
+  getRpcFailureRateCounter().add(1, { provider, endpoint });
+}
+
+export function __setRpcFallbackRecorderForTests(recorder: RpcFallbackMetricsRecorder | null): void {
+  rpcFallbackCustomRecorder = recorder;
+}
+
+export function __resetRpcFallbackMetricsForTests(): void {
+  rpcFallbackCustomRecorder = null;
+  rpcProviderCounter = undefined;
+  rpcProviderLatency = undefined;
+  rpcFallbackCounter = undefined;
+  rpcFailureRateCounter = undefined;
+}
