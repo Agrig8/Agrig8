@@ -9,17 +9,23 @@ import {
 } from 'react-native';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
-import { useAuthStore } from '../stores/authStore';
+import { useAuthStore, type WalletDisconnectReason } from '../stores/authStore';
 import { authApi } from '../api/auth';
 import { spacing } from '../constants/theme';
 
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 type Props = StackScreenProps<RootStackParamList, 'WalletConnect'>;
 
+const RECONNECT_MESSAGES: Record<WalletDisconnectReason, string> = {
+  expired: 'Your session expired. Reconnect your wallet to continue.',
+  disconnected: 'Your wallet was disconnected. Please reconnect to resume.',
+  network_mismatch: 'Network mismatch detected. Reconnect your wallet on the correct network.',
+};
+
 export default function WalletConnectScreen({ navigation }: Props) {
   const { contentStyle } = useResponsiveLayout();
   const [connecting, setConnecting] = useState(false);
-  const { setWalletAddress, setToken } = useAuthStore();
+  const { setWalletAddress, setToken, disconnectReason, clearDisconnectReason } = useAuthStore();
 
   const handleConnect = async () => {
     setConnecting(true);
@@ -58,6 +64,18 @@ export default function WalletConnectScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.container, contentStyle]}>
+      {disconnectReason ? (
+        <View style={styles.reconnectBanner} accessibilityRole="alert" testID="reconnect-banner">
+          <Text style={styles.reconnectBannerText}>{RECONNECT_MESSAGES[disconnectReason]}</Text>
+          <TouchableOpacity
+            onPress={clearDisconnectReason}
+            accessibilityLabel="Dismiss reconnect notice"
+            testID="reconnect-banner-dismiss"
+          >
+            <Text style={styles.reconnectDismiss}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
       <View style={styles.hero}>
         <Text style={styles.logo}>🌾</Text>
         <Text style={styles.title}>Amana</Text>
@@ -148,5 +166,29 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  reconnectBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderLeftWidth: 4,
+    borderLeftColor: '#D97706',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+    gap: 8,
+  },
+  reconnectBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400E',
+    lineHeight: 19,
+  },
+  reconnectDismiss: {
+    fontSize: 16,
+    color: '#92400E',
+    fontWeight: '700',
+    padding: 4,
   },
 });

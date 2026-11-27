@@ -19,6 +19,68 @@ export interface NotificationData {
   screen?: string;
 }
 
+/**
+ * Result of the pre-permission explanation flow (issue #67).
+ * - 'granted'  — permission was already granted or the user accepted after the explanation.
+ * - 'denied'   — user dismissed the explanation or the OS denied permission.
+ * - 'skipped'  — permission was already denied at the OS level; settings fallback was shown.
+ */
+export type NotificationPermissionResult = 'granted' | 'denied' | 'skipped';
+
+/**
+ * Ask the caller to show a rationale screen before the OS permission dialog (issue #67).
+ * Returns true if the user confirmed they want to proceed; false if they dismissed.
+ */
+export type ShowRationaleCallback = () => Promise<boolean>;
+
+/**
+ * Ask the caller to open the OS settings page as a fallback when permission is permanently
+ * denied (issue #67).
+ */
+export type OpenSettingsCallback = () => void;
+
+/**
+ * Request push-notification permission, preceded by an in-app explanation screen (issue #67).
+ *
+ * Flow:
+ * 1. If already granted, skip the rationale and return 'granted'.
+ * 2. If permanently denied (canAskAgain === false), invoke openSettings and return 'skipped'.
+ * 3. Otherwise show the rationale via showRationale(); if the user declines, return 'denied'.
+ * 4. Present the OS permission dialog; return 'granted' or 'denied' based on outcome.
+ */
+export async function requestNotificationPermissionWithRationale(
+  showRationale: ShowRationaleCallback,
+  openSettings: OpenSettingsCallback,
+): Promise<NotificationPermissionResult> {
+  try {
+    const { status: existingStatus, canAskAgain } =
+      await Notifications.getPermissionsAsync();
+
+    if (existingStatus === "granted") {
+      const token = await Notifications.getExpoPushTokenAsync();
+      await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token.data);
+      return "granted";
+    }
+
+    if (!canAskAgain) {
+      openSettings();
+      return "skipped";
+    }
+
+    const userAccepted = await showRationale();
+    if (!userAccepted) return "denied";
+
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== "granted") return "denied";
+
+    const token = await Notifications.getExpoPushTokenAsync();
+    await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token.data);
+    return "granted";
+  } catch {
+    return "denied";
+  }
+}
+
 export async function registerForPushNotifications(): Promise<string | null> {
   try {
     const { status: existingStatus } =

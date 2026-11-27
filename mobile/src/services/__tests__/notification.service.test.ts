@@ -7,6 +7,7 @@ import {
   setupForegroundNotificationHandler,
   scheduleLocalNotification,
   checkNotificationPermissions,
+  requestNotificationPermissionWithRationale,
 } from '../notification.service';
 
 // Mock expo-notifications
@@ -210,5 +211,70 @@ describe('checkNotificationPermissions', () => {
   it('returns false when permission is denied', async () => {
     (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'denied' });
     expect(await checkNotificationPermissions()).toBe(false);
+  });
+});
+
+// issue #67 — notification permission explanation
+describe('requestNotificationPermissionWithRationale', () => {
+  it('returns granted immediately when permission is already granted', async () => {
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'granted', canAskAgain: true });
+    (Notifications.getExpoPushTokenAsync as jest.Mock).mockResolvedValue({ data: 'ExponentPushToken[x]' });
+
+    const showRationale = jest.fn();
+    const openSettings = jest.fn();
+    const result = await requestNotificationPermissionWithRationale(showRationale, openSettings);
+
+    expect(result).toBe('granted');
+    expect(showRationale).not.toHaveBeenCalled();
+    expect(openSettings).not.toHaveBeenCalled();
+  });
+
+  it('opens settings and returns skipped when canAskAgain is false', async () => {
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'denied', canAskAgain: false });
+
+    const showRationale = jest.fn();
+    const openSettings = jest.fn();
+    const result = await requestNotificationPermissionWithRationale(showRationale, openSettings);
+
+    expect(result).toBe('skipped');
+    expect(openSettings).toHaveBeenCalled();
+    expect(showRationale).not.toHaveBeenCalled();
+  });
+
+  it('shows rationale; returns denied when user declines the explanation', async () => {
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'undetermined', canAskAgain: true });
+
+    const showRationale = jest.fn().mockResolvedValue(false);
+    const openSettings = jest.fn();
+    const result = await requestNotificationPermissionWithRationale(showRationale, openSettings);
+
+    expect(result).toBe('denied');
+    expect(showRationale).toHaveBeenCalled();
+    expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+  });
+
+  it('shows rationale, then requests OS permission, returns granted on success', async () => {
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'undetermined', canAskAgain: true });
+    (Notifications.requestPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'granted' });
+    (Notifications.getExpoPushTokenAsync as jest.Mock).mockResolvedValue({ data: 'ExponentPushToken[new]' });
+
+    const showRationale = jest.fn().mockResolvedValue(true);
+    const openSettings = jest.fn();
+    const result = await requestNotificationPermissionWithRationale(showRationale, openSettings);
+
+    expect(result).toBe('granted');
+    expect(showRationale).toHaveBeenCalled();
+    expect(Notifications.requestPermissionsAsync).toHaveBeenCalled();
+  });
+
+  it('returns denied when OS dialog is dismissed after rationale was accepted', async () => {
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'undetermined', canAskAgain: true });
+    (Notifications.requestPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'denied' });
+
+    const showRationale = jest.fn().mockResolvedValue(true);
+    const openSettings = jest.fn();
+    const result = await requestNotificationPermissionWithRationale(showRationale, openSettings);
+
+    expect(result).toBe('denied');
   });
 });

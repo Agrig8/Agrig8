@@ -67,4 +67,48 @@ describe('useDeepLink (auth-aware routing)', () => {
 
     expect(result.current.pendingDeepLink).toBeNull();
   });
+
+  // issue #62 — invalid-link error state
+  it('sets invalidLinkError for a non-empty unrecognised URL', () => {
+    setAuth('tok');
+    const { result } = renderHook(() => useDeepLink());
+
+    act(() => { result.current.handleUrl('https://amanavault.app/not-a-real-path'); });
+
+    expect(result.current.invalidLinkError).toEqual({ url: 'https://amanavault.app/not-a-real-path' });
+  });
+
+  it('dismissInvalidLink clears the error', () => {
+    setAuth('tok');
+    const { result } = renderHook(() => useDeepLink());
+
+    act(() => { result.current.handleUrl('https://amanavault.app/bad-route'); });
+    expect(result.current.invalidLinkError).not.toBeNull();
+
+    act(() => { result.current.dismissInvalidLink(); });
+    expect(result.current.invalidLinkError).toBeNull();
+  });
+
+  it('does not set invalidLinkError for null, empty, or undefined input', () => {
+    setAuth('tok');
+    const { result } = renderHook(() => useDeepLink());
+
+    act(() => { result.current.handleUrl(null); });
+    act(() => { result.current.handleUrl(''); });
+    act(() => { result.current.handleUrl(undefined); });
+
+    expect(result.current.invalidLinkError).toBeNull();
+  });
+
+  it('clears invalidLinkError when a valid URL is successfully routed', () => {
+    setAuth('tok');
+    const nav = { dispatch: jest.fn() } as never;
+    const { result } = renderHook(() => useDeepLink());
+
+    act(() => { result.current.handleUrl('https://amanavault.app/bad-route'); });
+    expect(result.current.invalidLinkError).not.toBeNull();
+
+    act(() => { result.current.handleUrl('https://amanavault.app/trades/T1', nav); });
+    expect(result.current.invalidLinkError).toBeNull();
+  });
 });

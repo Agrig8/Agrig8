@@ -30,8 +30,17 @@ function setPending(target: DeepLinkTarget | null): void {
   listeners.forEach((l) => l());
 }
 
+/** Set when handleUrl receives a non-empty URL that cannot be parsed (issue #62). */
+export interface InvalidDeepLinkError {
+  url: string;
+}
+
 interface UseDeepLinkReturn {
   pendingDeepLink: DeepLinkTarget | null;
+  /** Non-null when the most recent handleUrl call received an unrecognised URL (issue #62). */
+  invalidLinkError: InvalidDeepLinkError | null;
+  /** Dismiss the invalid-link error so the UI can return to its normal state (issue #62). */
+  dismissInvalidLink: () => void;
   /** Parse a raw URL (cold-start or runtime) and route or park it. */
   handleUrl: (url: string | null | undefined, navigation?: NavigationContainerRef<RootStackParamList> | null) => void;
   /** Route or park an already-parsed target (e.g. from a push notification tap). */
@@ -53,6 +62,7 @@ function navigate(
 export function useDeepLink(): UseDeepLinkReturn {
   const { token } = useAuthStore();
   const [pendingDeepLink, setPendingState] = useState<DeepLinkTarget | null>(pendingTarget);
+  const [invalidLinkError, setInvalidLinkError] = useState<InvalidDeepLinkError | null>(null);
 
   useEffect(() => {
     const sync = () => setPendingState(pendingTarget);
@@ -60,6 +70,10 @@ export function useDeepLink(): UseDeepLinkReturn {
     return () => {
       listeners.delete(sync);
     };
+  }, []);
+
+  const dismissInvalidLink = useCallback(() => {
+    setInvalidLinkError(null);
   }, []);
 
   const routeOrPark = useCallback(
@@ -77,7 +91,15 @@ export function useDeepLink(): UseDeepLinkReturn {
   const handleUrl = useCallback(
     (url: string | null | undefined, navigation?: NavigationContainerRef<RootStackParamList> | null) => {
       const target = parseDeepLink(url);
-      if (!target) return; // malformed / unknown → ignore
+      if (!target) {
+        // Surface a recoverable error only when the caller passed a non-empty string that
+        // looks like a link attempt but could not be matched to a known route (issue #62).
+        if (url && typeof url === 'string' && url.trim().length > 0) {
+          setInvalidLinkError({ url });
+        }
+        return;
+      }
+      setInvalidLinkError(null);
       routeOrPark(target, navigation);
     },
     [routeOrPark],
@@ -101,7 +123,7 @@ export function useDeepLink(): UseDeepLinkReturn {
     [token],
   );
 
-  return { pendingDeepLink, handleUrl, handleDeepLink, resumePendingDeepLink };
+  return { pendingDeepLink, invalidLinkError, dismissInvalidLink, handleUrl, handleDeepLink, resumePendingDeepLink };
 }
 
 /** Test helper. */

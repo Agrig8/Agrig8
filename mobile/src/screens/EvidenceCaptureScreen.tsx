@@ -25,6 +25,9 @@ interface CapturedMedia {
   name: string;
 }
 
+/** Maximum number of media items held in state at once (issue #66). */
+const MAX_QUEUED_ITEMS = 1;
+
 export default function EvidenceCaptureScreen({ route, navigation }: Props) {
   const { contentStyle } = useResponsiveLayout();
   const { tradeId } = route.params;
@@ -37,6 +40,15 @@ export default function EvidenceCaptureScreen({ route, navigation }: Props) {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const uploadController = useRef<AbortController | null>(null);
+  // Tracks URIs that have been processed so they can be released (issue #66).
+  const releasedUris = useRef<Set<string>>(new Set());
+
+  /** Release the in-memory reference to a captured item's URI (issue #66). */
+  const releaseCapture = (item: CapturedMedia | null) => {
+    if (!item) return;
+    releasedUris.current.add(item.uri);
+    setCaptured(null);
+  };
 
   useEffect(
     () => () => {
@@ -48,6 +60,8 @@ export default function EvidenceCaptureScreen({ route, navigation }: Props) {
   // In a production build this would call expo-image-picker or expo-camera.
   // Those packages are not yet installed; this placeholder simulates the capture step.
   const handleCapture = () => {
+    // Enforce the bounded pipeline: reject if already holding an item (issue #66).
+    if (captured && releasedUris.current.size >= MAX_QUEUED_ITEMS) return;
     Alert.alert(
       selectedType === 'video' ? 'Record Video' : 'Take Photo',
       'In a production build this opens the device camera. For now, a placeholder file is used.',
@@ -107,6 +121,7 @@ export default function EvidenceCaptureScreen({ route, navigation }: Props) {
 
       if (controller.signal.aborted) return;
       uploadController.current = null;
+      releaseCapture(captured); // release memory once successfully uploaded (issue #66)
       setUploadState('done');
     } catch (err: unknown) {
       if (controller.signal.aborted) return;
@@ -125,13 +140,14 @@ export default function EvidenceCaptureScreen({ route, navigation }: Props) {
     uploadController.current = null;
     setUploadProgress(0);
     setUploadError(null);
+    // Keep the captured item so the user can retry; resources are released on success or reset.
     setUploadState('captured');
   };
 
   const handleReset = () => {
     uploadController.current?.abort();
     uploadController.current = null;
-    setCaptured(null);
+    releaseCapture(captured); // release resources on explicit reset (issue #66)
     setUploadState('idle');
     setUploadError(null);
     setUploadProgress(0);

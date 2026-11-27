@@ -15,6 +15,9 @@ export async function readTokenWithMigration(): Promise<string | null> {
   return legacy;
 }
 
+/** Why the current wallet session ended, surfaced so the UI can explain it (issue #63). */
+export type WalletDisconnectReason = 'expired' | 'disconnected' | 'network_mismatch';
+
 interface AuthState {
   token: string | null;
   refreshToken: string | null;
@@ -22,6 +25,8 @@ interface AuthState {
   /** True when the authenticated user has the admin role. */
   isAdmin: boolean;
   isLoading: boolean;
+  /** Set when a session ends due to a recoverable wallet issue; null during normal use (issue #63). */
+  disconnectReason: WalletDisconnectReason | null;
   setToken: (token: string) => Promise<void>;
   setRefreshToken: (refreshToken: string) => Promise<void>;
   setWalletAddress: (address: string) => void;
@@ -29,6 +34,10 @@ interface AuthState {
   getToken: () => Promise<string | null>;
   getRefreshToken: () => Promise<string | null>;
   clearAuth: () => Promise<void>;
+  /** Clear credentials and record the disconnect reason so WalletConnectScreen can explain it (issue #63). */
+  expireSession: (reason: WalletDisconnectReason) => Promise<void>;
+  /** Dismiss the reconnect banner without signing in (issue #63). */
+  clearDisconnectReason: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -37,6 +46,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   walletAddress: null,
   isAdmin: false,
   isLoading: true,
+  disconnectReason: null,
 
   setToken: async (token: string) => {
     await SecureStore.setItemAsync(TOKEN_KEY, token);
@@ -82,6 +92,17 @@ export const useAuthStore = create<AuthState>((set) => ({
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     await SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY);
     await SecureStore.deleteItemAsync('amana_refresh_token');
-    set({ token: null, refreshToken: null, walletAddress: null, isAdmin: false });
+    set({ token: null, refreshToken: null, walletAddress: null, isAdmin: false, disconnectReason: null });
+  },
+
+  expireSession: async (reason: WalletDisconnectReason) => {
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY);
+    await SecureStore.deleteItemAsync('amana_refresh_token');
+    set({ token: null, refreshToken: null, walletAddress: null, isAdmin: false, disconnectReason: reason });
+  },
+
+  clearDisconnectReason: () => {
+    set({ disconnectReason: null });
   },
 }));
