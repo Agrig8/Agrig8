@@ -493,7 +493,11 @@ export default function TradeDetailScreen({ route, navigation, embedded = false 
         {/* Status card */}
         <View style={styles.statusCard}>
           <Text style={styles.tradeIdText}>#{currentTrade.tradeId.slice(0, 12)}…</Text>
-          <View style={[styles.statusBadge, { backgroundColor: `${statusColor}22` }]}>
+          <View
+            style={[styles.statusBadge, { backgroundColor: `${statusColor}22` }]}
+            accessibilityRole="text"
+            accessibilityLabel={`Status: ${STATUS_LABELS[status]}`}
+          >
             <Text style={[styles.statusText, { color: statusColor }]}>{STATUS_LABELS[status]}</Text>
           </View>
           <Text style={styles.amountText}>{formatAmount(currentTrade.amountUsdc, 'USDC')} USDC</Text>
