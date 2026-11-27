@@ -27,6 +27,19 @@ export enum BackendErrorCode {
   ADMIN_OPERATION_TIMEOUT = "ADMIN_OPERATION_TIMEOUT",
   CLAWBACK_TOO_LARGE = "CLAWBACK_TOO_LARGE",
   CLAWBACK_INVALID_AMOUNT = "CLAWBACK_INVALID_AMOUNT",
+  // Stellar / contract error codes (issue #34)
+  SUBMISSION_VALIDATION_ERROR = "SUBMISSION_VALIDATION_ERROR",
+  SUBMISSION_NETWORK_ERROR = "SUBMISSION_NETWORK_ERROR",
+  SUBMISSION_CONTRACT_ERROR = "SUBMISSION_CONTRACT_ERROR",
+  SUBMISSION_AUTHORIZATION_ERROR = "SUBMISSION_AUTHORIZATION_ERROR",
+  STELLAR_INSUFFICIENT_BALANCE = "STELLAR_INSUFFICIENT_BALANCE",
+  STELLAR_BAD_SEQUENCE = "STELLAR_BAD_SEQUENCE",
+  STELLAR_TRANSACTION_TIMING = "STELLAR_TRANSACTION_TIMING",
+  STELLAR_ACCOUNT_NOT_FOUND = "STELLAR_ACCOUNT_NOT_FOUND",
+  STELLAR_CONTRACT_NOT_FOUND = "STELLAR_CONTRACT_NOT_FOUND",
+  STELLAR_RATE_LIMITED = "STELLAR_RATE_LIMITED",
+  STELLAR_TIMEOUT = "STELLAR_TIMEOUT",
+  STELLAR_UNKNOWN_ERROR = "STELLAR_UNKNOWN_ERROR",
 }
 
 /**
@@ -155,6 +168,67 @@ const ERROR_MESSAGE_MAP: Record<string, { title: string; message: string; type: 
     title: "Invalid Amount",
     message: "Enter a clawback amount greater than zero.",
     type: "warning",
+  },
+  // Stellar / contract error codes (issue #34)
+  [BackendErrorCode.SUBMISSION_VALIDATION_ERROR]: {
+    title: "Invalid Transaction",
+    message: "The transaction data is invalid. Check the details and try again.",
+    type: "warning",
+  },
+  [BackendErrorCode.SUBMISSION_NETWORK_ERROR]: {
+    title: "Network Error",
+    message: "Could not reach the Stellar network. Please check your connection and retry.",
+    type: "error",
+  },
+  [BackendErrorCode.SUBMISSION_CONTRACT_ERROR]: {
+    title: "Contract Rejected",
+    message: "The escrow contract rejected this operation. The trade may be in an incompatible state.",
+    type: "error",
+  },
+  [BackendErrorCode.SUBMISSION_AUTHORIZATION_ERROR]: {
+    title: "Not Authorised",
+    message: "Your wallet is not authorised to perform this action on the contract.",
+    type: "error",
+  },
+  [BackendErrorCode.STELLAR_INSUFFICIENT_BALANCE]: {
+    title: "Insufficient Balance",
+    message: "Your wallet does not have enough funds to cover this transaction and fees.",
+    type: "error",
+  },
+  [BackendErrorCode.STELLAR_BAD_SEQUENCE]: {
+    title: "Sequence Error",
+    message: "Transaction sequence mismatch — please wait a moment and try again.",
+    type: "warning",
+  },
+  [BackendErrorCode.STELLAR_TRANSACTION_TIMING]: {
+    title: "Transaction Expired",
+    message: "The transaction window expired before submission. Please try again.",
+    type: "warning",
+  },
+  [BackendErrorCode.STELLAR_ACCOUNT_NOT_FOUND]: {
+    title: "Account Not Found",
+    message: "The Stellar account could not be found. Ensure it has been activated.",
+    type: "error",
+  },
+  [BackendErrorCode.STELLAR_CONTRACT_NOT_FOUND]: {
+    title: "Contract Not Found",
+    message: "The escrow contract address is unreachable. Contact support.",
+    type: "error",
+  },
+  [BackendErrorCode.STELLAR_RATE_LIMITED]: {
+    title: "Rate Limited",
+    message: "The Stellar network is rate-limiting requests. Please wait a moment and try again.",
+    type: "warning",
+  },
+  [BackendErrorCode.STELLAR_TIMEOUT]: {
+    title: "Request Timed Out",
+    message: "The Stellar RPC request timed out. The network may be congested — try again shortly.",
+    type: "warning",
+  },
+  [BackendErrorCode.STELLAR_UNKNOWN_ERROR]: {
+    title: "Stellar Error",
+    message: "An unexpected error occurred with the Stellar network. Please try again.",
+    type: "error",
   },
 };
 

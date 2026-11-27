@@ -229,6 +229,26 @@ export default function Step1Details() {
         )}
       </div>
 
+      <div className="flex flex-col gap-1">
+        <label htmlFor="buyer-address" className="text-sm text-text-secondary">Buyer Stellar Address</label>
+        <input
+          id="buyer-address"
+          type="text"
+          placeholder="G..."
+          value={data.buyerAddress}
+          aria-invalid={Boolean(errors.buyerAddress && touched.buyerAddress)}
+          aria-describedby={errors.buyerAddress && touched.buyerAddress ? "buyer-address-error" : undefined}
+          onChange={(e) => { update({ buyerAddress: e.target.value.trim() }); setErrors((prev) => ({ ...prev, buyerAddress: "" })); }}
+          onBlur={() => handleBlur("buyerAddress")}
+          className="bg-bg-input border border-border-default rounded-md px-4 py-3 text-text-primary font-mono text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold"
+        />
+        {errors.buyerAddress && touched.buyerAddress && (
+          <p id="buyer-address-error" role="alert" aria-live="polite" className="text-status-danger text-xs mt-1">
+            <span className="mr-1" aria-hidden="true">⚠</span>{errors.buyerAddress}
+          </p>
+        )}
+      </div>
+
       <button
         disabled={!valid}
         onClick={handleContinue}

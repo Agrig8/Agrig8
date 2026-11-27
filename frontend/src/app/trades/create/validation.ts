@@ -23,7 +23,14 @@ export const step1Schema = z.object({
     (val) => val !== "" && StrKey.isValidEd25519PublicKey(val.trim()),
     { message: "Invalid Stellar public key" }
   ),
-});
+  buyerAddress: z.string().refine(
+    (val) => val !== "" && StrKey.isValidEd25519PublicKey(val.trim()),
+    { message: "Invalid Stellar public key" }
+  ),
+}).refine(
+  (data) => data.sellerAddress.trim() !== data.buyerAddress.trim(),
+  { message: "Buyer and seller addresses must be different", path: ["buyerAddress"] }
+);
 
 export const step2Schema = z.object({
   buyerRatio: z.number().min(0).max(100),
@@ -44,6 +51,7 @@ export const step3Schema = z.object({
   pricePerUnit: z.string().min(1),
   currency: z.string().min(1),
   sellerAddress: z.string().min(1),
+  buyerAddress: z.string().min(1),
   buyerRatio: z.number(),
   sellerRatio: z.number(),
   deliveryDays: z.string().min(1),
