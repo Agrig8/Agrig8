@@ -188,11 +188,12 @@ describe("requestLoggerMiddleware – correlation ID propagation", () => {
 
   it("generates a correlation ID when caller does not supply one", async () => {
     const app = makeApp(200);
-    await request(app).get("/test");
+    const res = await request(app).get("/test");
 
     const [fields] = infoSpy.mock.calls[0];
     expect(fields.correlationId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     );
+    expect(fields.correlationId).toBe(res.headers["x-correlation-id"]);
   });
 });

@@ -27,4 +27,16 @@ describe("EncryptionService", () => {
     expect(rotated).toContain("v2:");
     expect(service.decrypt(rotated, "trade-456")).toEqual("Need rotation");
   });
+
+  it("rejects decryption when the key context does not match the envelope", () => {
+    const ciphertext = service.encrypt("Sensitive PII", "trade-789", "v2");
+
+    expect(() => service.decrypt(ciphertext, "another-trade")).toThrow();
+    expect(() =>
+      new EncryptionService("different-master-secret-value-with-minimum-length-32").decrypt(
+        ciphertext,
+        "trade-789",
+      ),
+    ).toThrow();
+  });
 });
