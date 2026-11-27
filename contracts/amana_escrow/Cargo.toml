@@ -133,3 +133,18 @@ path = "tests/pause_metadata_tests.rs"
 [[test]]
 name = "trade_state_machine_proptest"
 path = "tests/trade_state_machine_proptest.rs"
+
+# Issue #52 — zero-value deposit rejection
+[[test]]
+name = "zero_value_deposit_tests"
+path = "tests/zero_value_deposit_tests.rs"
+
+# Issue #57 — fee rounding invariant tests
+[[test]]
+name = "fee_rounding_invariant_tests"
+path = "tests/fee_rounding_invariant_tests.rs"
+
+# Issue #59 — fuzz dispute settlement paths
+[[test]]
+name = "dispute_settlement_fuzz_tests"
+path = "tests/dispute_settlement_fuzz_tests.rs"
