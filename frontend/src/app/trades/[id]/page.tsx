@@ -10,6 +10,7 @@ import { useWallet } from "@/hooks/useWallet";
 import { api, ApiError } from "@/lib/api";
 import { apiConfig } from "@/lib/api";
 import { TxSummaryModal, type TxSummaryItem } from "@/components/ui/TxSummaryModal";
+import { ConfirmActionModal } from "@/components/ui/ConfirmActionModal";
 
 function formatDate(dateString: string) {
   return new Date(dateString).toLocaleString("en-US", {
@@ -130,6 +131,11 @@ export default function TradeDetailPage() {
   // #71 — pending action waits in state until user confirms in TxSummaryModal.
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
+  // #38 — confirmation gate for destructive actions before the API call.
+  type DestructiveIntent = "confirm-delivery" | "release-funds" | "initiate-dispute";
+  const [destructiveIntent, setDestructiveIntent] = useState<DestructiveIntent | null>(null);
+  const [disputeReason, setDisputeReason] = useState("");
+
   const role: UserRole = trade
     ? deriveRole(address, trade.buyerAddress, trade.sellerAddress)
     : "observer";
@@ -209,26 +215,85 @@ export default function TradeDetailPage() {
   }
 
   function handleConfirmDelivery() {
-    void runAction("Confirm Delivery", () => api.trades.confirmDelivery(token!, tradeId));
+    setDestructiveIntent("confirm-delivery");
   }
 
   function handleReleaseFunds() {
-    void runAction("Release Funds", () => api.trades.releaseFunds(token!, tradeId));
+    setDestructiveIntent("release-funds");
   }
 
   function handleInitiateDispute() {
-    const reason = window.prompt("Enter dispute reason (min 10 characters):");
-    if (!reason || reason.length < 10) {
-      setActionError("Dispute reason must be at least 10 characters.");
-      return;
+    setDisputeReason("");
+    setDestructiveIntent("initiate-dispute");
+  }
+
+  function executeDestructiveAction() {
+    setDestructiveIntent(null);
+    if (destructiveIntent === "confirm-delivery") {
+      void runAction("Confirm Delivery", () => api.trades.confirmDelivery(token!, tradeId));
+    } else if (destructiveIntent === "release-funds") {
+      void runAction("Release Funds", () => api.trades.releaseFunds(token!, tradeId));
+    } else if (destructiveIntent === "initiate-dispute") {
+      if (!disputeReason || disputeReason.length < 10) {
+        setActionError("Dispute reason must be at least 10 characters.");
+        return;
+      }
+      void runAction("Initiate Dispute", () =>
+        api.trades.initiateDispute(token!, tradeId, disputeReason, "other"),
+      );
     }
-    void runAction("Initiate Dispute", () =>
-      api.trades.initiateDispute(token!, tradeId, reason, "other"),
-    );
   }
 
   return (
     <div className="px-6 py-8 max-w-6xl mx-auto">
+      {/* #38 — Confirm Delivery confirmation modal */}
+      <ConfirmActionModal
+        open={destructiveIntent === "confirm-delivery"}
+        onOpenChange={(open) => { if (!open) setDestructiveIntent(null); }}
+        title="Confirm Delivery"
+        message="Confirming delivery signals that you have received the goods. This triggers the release pipeline and cannot be undone."
+        confirmLabel="Yes, Confirm Delivery"
+        variant="warning"
+        onConfirm={executeDestructiveAction}
+        loading={actionLoading}
+      />
+
+      {/* #38 — Release Funds confirmation modal */}
+      <ConfirmActionModal
+        open={destructiveIntent === "release-funds"}
+        onOpenChange={(open) => { if (!open) setDestructiveIntent(null); }}
+        title="Release Funds"
+        message="Releasing funds will transfer the escrowed amount to the seller. This action is irreversible."
+        confirmLabel="Release Funds"
+        variant="danger"
+        onConfirm={executeDestructiveAction}
+        loading={actionLoading}
+      />
+
+      {/* #38 — Initiate Dispute confirmation modal */}
+      <ConfirmActionModal
+        open={destructiveIntent === "initiate-dispute"}
+        onOpenChange={(open) => { if (!open) setDestructiveIntent(null); }}
+        title="Initiate Dispute"
+        message={
+          <div className="flex flex-col gap-3">
+            <p>Initiating a dispute will freeze this trade and notify a mediator. Please provide a reason.</p>
+            <textarea
+              className="w-full rounded-md border border-border-default bg-bg-card px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-gold"
+              rows={3}
+              placeholder="Describe the issue (min 10 characters)…"
+              value={disputeReason}
+              onChange={(e) => setDisputeReason(e.target.value)}
+              aria-label="Dispute reason"
+            />
+          </div>
+        }
+        confirmLabel="Initiate Dispute"
+        variant="danger"
+        onConfirm={executeDestructiveAction}
+        loading={actionLoading}
+      />
+
       {/* #71 — Transaction summary modal shown before Freighter signing */}
       <TxSummaryModal
         open={pendingAction !== null}

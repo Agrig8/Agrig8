@@ -1,4 +1,5 @@
 import { Response, NextFunction } from "express";
+import { StrKey } from "@stellar/stellar-sdk";
 import { AuthRequest } from "../services/auth.service";
 import { findOrCreateUser, updateUser, updateDisplayName, getPublicProfile } from "../services/user.service";
 import { AppError, ErrorCode } from "../errors/errorCodes";
@@ -73,6 +74,10 @@ export async function getUserByAddress(req: AuthRequest, res: Response, next: Ne
 
   if (!address) {
     return next(new AppError(ErrorCode.VALIDATION_ERROR, "Wallet address is required", 400));
+  }
+
+  if (!StrKey.isValidEd25519PublicKey(address)) {
+    return next(new AppError(ErrorCode.VALIDATION_ERROR, "Invalid Stellar wallet address", 400));
   }
 
   try {

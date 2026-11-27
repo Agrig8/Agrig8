@@ -34,8 +34,8 @@ export interface ConfirmActionModalProps {
   onOpenChange: (open: boolean) => void;
   /** Short headline shown in the dialog header. */
   title: string;
-  /** Longer explanation of what will happen. */
-  message: string;
+  /** Longer explanation of what will happen. May include JSX for richer content. */
+  message: React.ReactNode;
   /** Label for the confirming action button (default: "Confirm"). */
   confirmLabel?: string;
   /** Label for the cancelling button (default: "Cancel"). */
