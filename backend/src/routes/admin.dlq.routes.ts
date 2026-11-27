@@ -6,6 +6,7 @@ import { validateRequest } from '../middleware/validateRequest';
 import { AuthRequest } from '../services/auth.service';
 import { appLogger } from '../middleware/logger';
 import { getDeadLetterQueue } from '../jobs/deadLetter';
+import { prisma } from '../lib/db';
 import {
   webhookQueue,
   notificationQueue,
@@ -94,6 +95,18 @@ export function createAdminDlqRouter(): Router {
       }
       await targetQueue.add(dlqJob.data.jobName, dlqJob.data.data);
       await dlqJob.remove();
+
+      // Audit the privileged replay action so every DLQ replay is traceable
+      // by actor, queue, and job id — issue #76: every admin action must emit
+      // immutable audit data with actor, action, target, and timestamp.
+      await prisma.adminActionAudit.create({
+        data: {
+          action: 'DLQ_REPLAY',
+          actorAddress: req.user?.walletAddress ?? 'unknown',
+          targetReference: `${queueName}/${jobId}`,
+          note: `Replayed dead-letter job "${dlqJob.data.jobName}" from ${queueName}-dlq`,
+        },
+      });
 
       appLogger.info(
         { queueName, jobId, adminAddress: req.user?.walletAddress },
