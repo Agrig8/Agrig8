@@ -110,6 +110,9 @@ export const envSchema = z.object({
     .default('false')
     .transform((value: string) => value.toLowerCase() === 'true'),
   MANIFEST_PII_RETENTION_DAYS: z.coerce.number().default(30),
+  // Trade Archive Retention Policy (Issue #144): days a terminal trade record
+  // is kept before it becomes eligible for archive storage.
+  TRADE_ARCHIVE_RETENTION_DAYS: z.coerce.number().int().nonnegative().default(730),
 
   // Soroban event listener
   EVENT_POLL_INTERVAL_MS: z.coerce.number().default(10000),

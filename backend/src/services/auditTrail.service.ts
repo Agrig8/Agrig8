@@ -42,6 +42,18 @@ export interface CanonicalAuditPayload {
     }>;
 }
 
+/** Documented audit export record: actor, action, target, timestamp. */
+export interface AuditExportEntry {
+    /** Actor recorded on the audit event (e.g. buyer, seller, evidence uploader). */
+    actor: string;
+    /** Audit action, e.g. "CREATED", "EVIDENCE_SUBMITTED". */
+    action: string;
+    /** Target of the action — the audited trade. */
+    target: string;
+    /** ISO 8601 timestamp of the action. */
+    timestamp: string;
+}
+
 export class AuditTrailAccessDeniedError extends Error {
     status = 403;
     constructor() {
@@ -246,6 +258,21 @@ export class AuditTrailService {
         events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
         return events;
+    }
+
+    /**
+     * Documented audit export format (Issue #141): one {@link AuditExportEntry}
+     * per audit event — actor, action, target (the audited trade) and an ISO
+     * 8601 timestamp. Enforces the same access rules as `getTradeHistory`.
+     */
+    async getAuditExport(tradeId: string, callerAddress: string): Promise<AuditExportEntry[]> {
+        const events = await this.getTradeHistory(tradeId, callerAddress);
+        return events.map((event) => ({
+            actor: event.actor,
+            action: event.eventType,
+            target: tradeId,
+            timestamp: event.timestamp.toISOString(),
+        }));
     }
 
     getCanonicalPayload(tradeId: string, events: TradeEvent[]): CanonicalAuditPayload {
