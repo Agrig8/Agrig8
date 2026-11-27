@@ -1,0 +1,207 @@
+name: Staging Signing Key Rotation
+
+# Rotates the STAGING_SIGNING_KEY secret automatically every 90 days.
+# The workflow:
+#   1. Generates a new Ed25519 signing key pair.
+#   2. Updates the GitHub secret via the API.
+#   3. Runs the staging smoke-test to verify the new key works.
+#   4. On failure, rolls back by restoring the previous key from the
+#      STAGING_SIGNING_KEY_PREV backup secret and re-runs smoke-tests.
+#
+# Required secrets (must be pre-created in GitHub org/repo settings):
+#   STAGING_SIGNING_KEY       — current active key (pem or base64 raw bytes)
+#   STAGING_SIGNING_KEY_PREV  — backup slot written here before each rotation
+#   GH_ROTATION_TOKEN         — PAT with secrets:write scope for this repo
+#   STAGING_API_URL           — base URL of the staging backend for smoke test
+#   STAGING_ADMIN_JWT         — long-lived admin JWT for the smoke test
+#
+# To trigger manually: Actions → "Staging Signing Key Rotation" → Run workflow
+
+on:
+  schedule:
+    # 02:00 UTC on the 1st of January, April, July, October (quarterly)
+    - cron: "0 2 1 1,4,7,10 *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run — generate key but do NOT update the secret"
+        required: false
+        default: "false"
+        type: boolean
+
+concurrency:
+  group: staging-signing-key-rotation
+  cancel-in-progress: false   # never cancel an in-flight rotation
+
+permissions:
+  contents: read
+
+jobs:
+  rotate:
+    name: Rotate Staging Signing Key
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 15
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Generate a new Ed25519 signing key pair
+      # -----------------------------------------------------------------------
+      - name: Generate new signing key
+        id: keygen
+        run: |
+          # Generate a PEM-encoded Ed25519 private key; extract the public key.
+          openssl genpkey -algorithm ed25519 -out new_key.pem
+          openssl pkey -in new_key.pem -pubout -out new_key_pub.pem
+
+          # Encode both for secret storage and log (public only).
+          NEW_KEY_B64=$(base64 -w0 new_key.pem)
+          NEW_PUB_B64=$(base64 -w0 new_key_pub.pem)
+
+          echo "new_key_b64=$NEW_KEY_B64"  >> "$GITHUB_OUTPUT"
+          echo "new_pub_b64=$NEW_PUB_B64"  >> "$GITHUB_OUTPUT"
+          echo "Public key (b64): $NEW_PUB_B64"
+
+          # Clean up key files from disk — the base64 value is in the step output
+          shred -u new_key.pem new_key_pub.pem
+
+      # -----------------------------------------------------------------------
+      # 2. Back up current key → STAGING_SIGNING_KEY_PREV
+      # -----------------------------------------------------------------------
+      - name: Back up current key
+        if: inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_ROTATION_TOKEN }}
+          CURRENT_KEY: ${{ secrets.STAGING_SIGNING_KEY }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Retrieve the repo's public key for secret encryption
+          PUB_KEY_RESP=$(gh api "repos/${REPO}/actions/secrets/public-key")
+          KEY_ID=$(echo "$PUB_KEY_RESP" | jq -r '.key_id')
+          PUB_KEY=$(echo "$PUB_KEY_RESP" | jq -r '.key')
+
+          # Encrypt the current signing key with libsodium via gh CLI helper
+          ENCRYPTED=$(echo -n "$CURRENT_KEY" | \
+            python3 -c "
+          import sys, base64
+          from nacl.public import SealedBox, PublicKey
+          pub = PublicKey(base64.b64decode('$PUB_KEY'))
+          box = SealedBox(pub)
+          enc = box.encrypt(sys.stdin.buffer.read())
+          print(base64.b64encode(enc).decode())
+          ")
+
+          gh api --method PUT "repos/${REPO}/actions/secrets/STAGING_SIGNING_KEY_PREV" \
+            --field encrypted_value="$ENCRYPTED" \
+            --field key_id="$KEY_ID"
+          echo "Backup complete."
+
+      # -----------------------------------------------------------------------
+      # 3. Install pynacl (needed for secret encryption)
+      # -----------------------------------------------------------------------
+      - name: Install pynacl
+        if: inputs.dry_run != 'true'
+        run: pip install pynacl --quiet
+
+      # -----------------------------------------------------------------------
+      # 4. Update STAGING_SIGNING_KEY with the new key
+      # -----------------------------------------------------------------------
+      - name: Update signing key secret
+        if: inputs.dry_run != 'true'
+        id: update_secret
+        env:
+          GH_TOKEN: ${{ secrets.GH_ROTATION_TOKEN }}
+          NEW_KEY_B64: ${{ steps.keygen.outputs.new_key_b64 }}
+          REPO: ${{ github.repository }}
+        run: |
+          PUB_KEY_RESP=$(gh api "repos/${REPO}/actions/secrets/public-key")
+          KEY_ID=$(echo "$PUB_KEY_RESP" | jq -r '.key_id')
+          PUB_KEY=$(echo "$PUB_KEY_RESP" | jq -r '.key')
+
+          ENCRYPTED=$(echo -n "$NEW_KEY_B64" | \
+            python3 -c "
+          import sys, base64
+          from nacl.public import SealedBox, PublicKey
+          pub = PublicKey(base64.b64decode('$PUB_KEY'))
+          box = SealedBox(pub)
+          enc = box.encrypt(sys.stdin.buffer.read())
+          print(base64.b64encode(enc).decode())
+          ")
+
+          gh api --method PUT "repos/${REPO}/actions/secrets/STAGING_SIGNING_KEY" \
+            --field encrypted_value="$ENCRYPTED" \
+            --field key_id="$KEY_ID"
+          echo "Secret updated."
+
+      # -----------------------------------------------------------------------
+      # 5. Smoke-test: verify the new key works against staging
+      # -----------------------------------------------------------------------
+      - name: Smoke-test new signing key
+        id: smoke_test
+        if: inputs.dry_run != 'true'
+        env:
+          STAGING_API_URL: ${{ secrets.STAGING_API_URL }}
+          STAGING_ADMIN_JWT: ${{ secrets.STAGING_ADMIN_JWT }}
+          NEW_KEY_B64: ${{ steps.keygen.outputs.new_key_b64 }}
+        run: |
+          # Decode the new key and produce a test Ed25519 signature.
+          echo "$NEW_KEY_B64" | base64 -d > /tmp/staging_key.pem
+
+          # Sign a known payload and send to the staging /admin/verify-signature probe.
+          PAYLOAD='{"probe":"signing-key-rotation-check"}'
+          SIG=$(echo -n "$PAYLOAD" | openssl pkeyutl -sign -inkey /tmp/staging_key.pem | base64 -w0)
+          shred -u /tmp/staging_key.pem
+
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${STAGING_API_URL}/admin/verify-signature" \
+            -H "Authorization: Bearer ${STAGING_ADMIN_JWT}" \
+            -H "Content-Type: application/json" \
+            -d "{\"payload\":${PAYLOAD},\"signature\":\"${SIG}\"}")
+
+          echo "Smoke test HTTP status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "SMOKE_TEST_FAILED=true" >> "$GITHUB_ENV"
+            exit 1
+          fi
+          echo "Smoke test passed."
+
+      # -----------------------------------------------------------------------
+      # 6. Rollback: restore previous key on smoke-test failure
+      # -----------------------------------------------------------------------
+      - name: Rollback to previous key
+        if: failure() && env.SMOKE_TEST_FAILED == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_ROTATION_TOKEN }}
+          PREV_KEY: ${{ secrets.STAGING_SIGNING_KEY_PREV }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "::warning::Smoke test failed — rolling back to previous signing key."
+
+          PUB_KEY_RESP=$(gh api "repos/${REPO}/actions/secrets/public-key")
+          KEY_ID=$(echo "$PUB_KEY_RESP" | jq -r '.key_id')
+          PUB_KEY=$(echo "$PUB_KEY_RESP" | jq -r '.key')
+
+          ENCRYPTED=$(echo -n "$PREV_KEY" | \
+            python3 -c "
+          import sys, base64
+          from nacl.public import SealedBox, PublicKey
+          pub = PublicKey(base64.b64decode('$PUB_KEY'))
+          box = SealedBox(pub)
+          enc = box.encrypt(sys.stdin.buffer.read())
+          print(base64.b64encode(enc).decode())
+          ")
+
+          gh api --method PUT "repos/${REPO}/actions/secrets/STAGING_SIGNING_KEY" \
+            --field encrypted_value="$ENCRYPTED" \
+            --field key_id="$KEY_ID"
+          echo "Rollback complete — previous key restored."
+          exit 1   # still fail the workflow so the team is notified
+
+      # -----------------------------------------------------------------------
+      # 7. Dry-run summary
+      # -----------------------------------------------------------------------
+      - name: Dry-run summary
+        if: inputs.dry_run == 'true'
+        run: |
+          echo "DRY RUN — no secrets were modified."
+          echo "New public key (b64): ${{ steps.keygen.outputs.new_pub_b64 }}"

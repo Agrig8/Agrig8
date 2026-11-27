@@ -155,6 +155,67 @@ describe("IPFSService", () => {
             // First upload performs retry attempts, second is short-circuited.
             expect(mockPinFileToIPFS).toHaveBeenCalledTimes(4);
         });
+
+        // issue #81 — circuit breaker half-open state and recovery tests
+        it("enters half-open state after cooldown and recovers on success", async () => {
+            // Open the circuit with one failure (threshold=1)
+            process.env.IPFS_PINATA_CIRCUIT_FAILURE_THRESHOLD = "1";
+            process.env.IPFS_PINATA_CIRCUIT_COOLDOWN_MS = "50"; // short cooldown for testing
+
+            mockPinFileToIPFS.mockRejectedValueOnce({ response: { status: 503 } });
+            await expect(
+                service.uploadFile(Buffer.from("open"), "open.mp4")
+            ).rejects.toBeInstanceOf(ServiceUnavailableError);
+
+            // Wait for cooldown so circuit moves to half-open
+            await new Promise((r) => setTimeout(r, 60));
+
+            // Next call should be a probe attempt (half-open); succeed it
+            mockPinFileToIPFS.mockResolvedValueOnce({ IpfsHash: "bafybeihalf" });
+            const cid = await service.uploadFile(Buffer.from("probe"), "probe.mp4");
+            expect(cid).toBe("bafybeihalf");
+        });
+
+        it("re-opens circuit when half-open probe fails", async () => {
+            process.env.IPFS_PINATA_CIRCUIT_FAILURE_THRESHOLD = "1";
+            process.env.IPFS_PINATA_CIRCUIT_COOLDOWN_MS = "50";
+
+            // Open the circuit
+            mockPinFileToIPFS.mockRejectedValueOnce({ response: { status: 503 } });
+            await expect(
+                service.uploadFile(Buffer.from("open"), "open.mp4")
+            ).rejects.toBeInstanceOf(ServiceUnavailableError);
+
+            // Wait for cooldown → half-open
+            await new Promise((r) => setTimeout(r, 60));
+
+            // Probe fails → circuit re-opens
+            mockPinFileToIPFS.mockRejectedValue({ response: { status: 503 } });
+            await expect(
+                service.uploadFile(Buffer.from("probe"), "probe.mp4")
+            ).rejects.toBeInstanceOf(ServiceUnavailableError);
+
+            // Immediately subsequent call must be short-circuited
+            const callCountAfterReopen = mockPinFileToIPFS.mock.calls.length;
+            await expect(
+                service.uploadFile(Buffer.from("after-reopen"), "after.mp4")
+            ).rejects.toBeInstanceOf(ServiceUnavailableError);
+            expect(mockPinFileToIPFS).toHaveBeenCalledTimes(callCountAfterReopen);
+        });
+
+        it("bounded backoff: does not retry on 4xx client errors", async () => {
+            // 400-class errors from Pinata indicate a request problem; retrying
+            // wastes capacity and should not happen.
+            mockPinFileToIPFS.mockRejectedValue({ response: { status: 400 } });
+
+            await expect(
+                service.uploadFile(Buffer.from("bad"), "bad.mp4")
+            ).rejects.toThrow();
+
+            // With maxRetries in retryAsync defaulting to 3, a non-retryable error
+            // means only 1 Pinata call is made.
+            expect(mockPinFileToIPFS).toHaveBeenCalledTimes(1);
+        });
     });
 
     describe("getFileUrl", () => {
