@@ -273,6 +273,43 @@ describe('REFUNDED status', () => {
   });
 });
 
+describe('Trade deadline', () => {
+  it('shows the remaining time and deadline in the local timezone', () => {
+    const expiresAt = new Date(Date.now() + 90 * 60 * 1000).toISOString();
+    setupStore(makeTrade({ status: 'IN_TRANSIT', expiresAt }));
+    const { getByTestId, getByText } = render(
+      <TradeDetailScreen navigation={mockNavigation} route={makeRoute('trade-abc-001')} />,
+    );
+    const localDeadline = new Intl.DateTimeFormat(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short',
+    }).format(new Date(expiresAt));
+
+    expect(getByTestId('trade-deadline')).toBeTruthy();
+    expect(getByText('Trade deadline')).toBeTruthy();
+    expect(getByText('1h 30m remaining')).toBeTruthy();
+    expect(getByText(`Deadline: ${localDeadline}`)).toBeTruthy();
+  });
+
+  it('explains an elapsed deadline and omits countdowns after expiry', () => {
+    setupStore(makeTrade({ status: 'DELIVERED', expiresAt: '2020-01-01T00:00:00.000Z' }));
+    const { getByText, getAllByText, rerender, queryByTestId } = render(
+      <TradeDetailScreen navigation={mockNavigation} route={makeRoute('trade-abc-001')} />,
+    );
+    expect(getByText('Trade deadline')).toBeTruthy();
+    expect(getByText('Deadline passed')).toBeTruthy();
+
+    setupStore(makeTrade({ status: 'EXPIRED', expiresAt: '2020-01-01T00:00:00.000Z' }));
+    rerender(<TradeDetailScreen navigation={mockNavigation} route={makeRoute('trade-abc-001')} />);
+    expect(getAllByText('Expired').length).toBeGreaterThan(0);
+    expect(queryByTestId('trade-deadline')).toBeNull();
+  });
+});
+
 describe('Notes', () => {
   it('shows empty notes state initially', async () => {
     setupStore(makeTrade());
