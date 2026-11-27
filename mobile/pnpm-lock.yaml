@@ -42,8 +42,8 @@ importers:
         specifier: ~17.0.8
         version: 17.0.8(expo@52.0.49(@babel/core@7.29.13)(@babel/preset-env@7.29.7(@babel/core@7.29.13))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))
       expo-device:
-        specifier: ^6.0.2
-        version: 6.0.2(expo@52.0.49(@babel/core@7.29.13)(@babel/preset-env@7.29.7(@babel/core@7.29.13))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1))
+        specifier: ^58.0.5
+        version: 58.0.5(expo@52.0.49(@babel/core@7.29.13)(@babel/preset-env@7.29.7(@babel/core@7.29.13))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1))
       expo-haptics:
         specifier: ~58.0.8
         version: 58.0.8(expo@52.0.49(@babel/core@7.29.13)(@babel/preset-env@7.29.7(@babel/core@7.29.13))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1))
@@ -2824,8 +2824,8 @@ packages:
       expo: '*'
       react-native: '*'
 
-  expo-device@6.0.2:
-    resolution: {integrity: sha512-sCt91CuTmAuMXX4SlFOn4lIos2UIr8vb0jDstDDZXys6kErcj0uynC7bQAMreU5uRUTKMAl4MAMpKt9ufCXPBw==}
+  expo-device@58.0.5:
+    resolution: {integrity: sha512-GNyaHPwoiI/z2SGR14R6d9J7hFSW2JabZieJtC3l6/LO2mJYVCbhEsQ7/1ljGBeTUnFFWHcFLccdaWEhOWtaQQ==}
     peerDependencies:
       expo: '*'
 
@@ -9599,7 +9599,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  expo-device@6.0.2(expo@52.0.49(@babel/core@7.29.13)(@babel/preset-env@7.29.7(@babel/core@7.29.13))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)):
+  expo-device@58.0.5(expo@52.0.49(@babel/core@7.29.13)(@babel/preset-env@7.29.7(@babel/core@7.29.13))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)):
     dependencies:
       expo: 52.0.49(@babel/core@7.29.13)(@babel/preset-env@7.29.7(@babel/core@7.29.13))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)
       ua-parser-js: 0.7.41
