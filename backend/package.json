@@ -10,7 +10,10 @@
     "lint": "eslint src/",
     "postinstall": "npx prisma generate",
     "mutation": "stryker run stryker.money-math.config.json",
-    "mutation:ci": "stryker run stryker.money-math.config.json --reporters html,json,progress"
+    "mutation:ci": "stryker run stryker.money-math.config.json --reporters html,json,progress",
+    "detect:orphaned-evidence": "tsx scripts/detect-orphaned-evidence.ts",
+    "detect:orphaned-evidence:dry": "tsx scripts/detect-orphaned-evidence.ts --dry-run",
+    "detect:orphaned-evidence:json": "tsx scripts/detect-orphaned-evidence.ts --json --no-fail-on-orphans"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

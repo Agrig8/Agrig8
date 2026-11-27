@@ -198,6 +198,11 @@ jobs:
         if: needs.changes.outputs.frontend == 'true'
         run: pnpm test src/__tests__/accessibility --verbose
 
+      - name: Check OpenAPI ↔ frontend types drift
+        if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.backend == 'true'
+        working-directory: .
+        run: node scripts/check-openapi-types-drift.mjs
+
       - name: Upload coverage report
         if: needs.changes.outputs.frontend == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
