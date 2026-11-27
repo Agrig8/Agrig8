@@ -36,8 +36,8 @@ importers:
         specifier: ^52.0.0
         version: 52.0.49(@babel/core@7.29.13)(@babel/preset-env@7.29.7(@babel/core@7.29.13))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)
       expo-clipboard:
-        specifier: ~7.0.1
-        version: 7.0.1(expo@52.0.49(@babel/core@7.29.13)(@babel/preset-env@7.29.7(@babel/core@7.29.13))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)
+        specifier: ~58.0.4
+        version: 58.0.4(expo@52.0.49(@babel/core@7.29.13)(@babel/preset-env@7.29.7(@babel/core@7.29.13))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)
       expo-constants:
         specifier: ~17.0.8
         version: 17.0.8(expo@52.0.49(@babel/core@7.29.13)(@babel/preset-env@7.29.7(@babel/core@7.29.13))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))
@@ -2806,8 +2806,8 @@ packages:
       react: '*'
       react-native: '*'
 
-  expo-clipboard@7.0.1:
-    resolution: {integrity: sha512-rqYk0+WoqitPcPKxmMxSpLonX1E5Ije3LBYfnYMbH3xU5Gr8EAH9QnOWOi4BgahUPvcot6nbFEnx+DqARrmxKQ==}
+  expo-clipboard@58.0.4:
+    resolution: {integrity: sha512-b2eEJMwdWXLTrmrkg/otsmL2OV6s9D90tytSNBsY87UswrWf6JwxcB2OaWegyUWD9XnvtBVNeVK7lej0zZh+5A==}
     peerDependencies:
       expo: '*'
       react: '*'
@@ -9576,7 +9576,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  expo-clipboard@7.0.1(expo@52.0.49(@babel/core@7.29.13)(@babel/preset-env@7.29.7(@babel/core@7.29.13))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1):
+  expo-clipboard@58.0.4(expo@52.0.49(@babel/core@7.29.13)(@babel/preset-env@7.29.7(@babel/core@7.29.13))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1):
     dependencies:
       expo: 52.0.49(@babel/core@7.29.13)(@babel/preset-env@7.29.7(@babel/core@7.29.13))(react-native@0.88.1(@babel/core@7.29.13)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)
       react: 18.3.1
