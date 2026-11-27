@@ -10,6 +10,18 @@ import {
 } from "../lib/money";
 
 /**
+ * Escrow amount boundaries that mirror the Amana smart contract limits (issue #41).
+ *
+ * MIN: 1 cNGN (100 stroops at 7 decimals) — prevents zero-value dust trades.
+ * MAX: 1,000,000 cNGN (1e13 stroops) — matches the contract's i128 guard rail.
+ *
+ * Both are expressed in stroops (the atomic unit) so the comparison is integer
+ * arithmetic and free of floating-point rounding errors.
+ */
+export const ESCROW_AMOUNT_MIN_STROOPS = 100n; // 0.000_010_0 cNGN
+export const ESCROW_AMOUNT_MAX_STROOPS = 10_000_000_000_000n; // 1,000,000 cNGN
+
+/**
  * Trade creation validation is the CANONICAL shared domain schema
  * (`./domain/trade`, mirrored in `frontend/src/lib/domain-schemas/trade.ts`),
  * plus backend-only checks the framework-free shared schema can't express:
@@ -36,6 +48,18 @@ export const createTradeSchema = createTradeInputSchema
         const stroops = parseDecimalToStroops(data.amountUsdc, MONEY_DECIMALS);
         if (stroops <= 0n) {
           ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Amount must be positive", path: ["amountUsdc"] });
+        } else if (stroops < ESCROW_AMOUNT_MIN_STROOPS) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Amount is below the minimum escrow limit (0.0000100 cNGN)`,
+            path: ["amountUsdc"],
+          });
+        } else if (stroops > ESCROW_AMOUNT_MAX_STROOPS) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Amount exceeds the maximum escrow limit (1,000,000 cNGN)`,
+            path: ["amountUsdc"],
+          });
         }
       } catch (error) {
         ctx.addIssue({

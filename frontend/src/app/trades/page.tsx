@@ -253,69 +253,75 @@ export default function TradesPage() {
               </Link>
             </div>
           ) : (
-            <div className="rounded-lg border border-border-default overflow-hidden shadow-elev-1">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border-default bg-surface-1">
-                    <th className="text-left px-4 py-3 text-text-muted font-medium">
-                      ID
-                    </th>
-                    <th className="text-left px-4 py-3 text-text-muted font-medium">
-                      Counterparty
-                    </th>
-                    <th className="text-left px-4 py-3 text-text-muted font-medium">
-                      Amount
-                    </th>
-                    <th className="text-left px-4 py-3 text-text-muted font-medium">
-                      Status
-                    </th>
-                    <th className="text-left px-4 py-3 text-text-muted font-medium">
-                      Created
-                    </th>
-                  </tr>
-                </thead>
-              </table>
-              <VirtualizedList
-                items={trades}
-                rowHeight={ROW_HEIGHT}
-                maxHeight={Math.min(trades.length * ROW_HEIGHT, 600)}
-                keyExtractor={(trade) => trade.tradeId}
-                renderItem={(trade, i) => (
-                  <div
-                    className={`grid grid-cols-5 gap-4 px-4 py-3 border-b border-border-default last:border-0 hover:bg-surface-2 transition-colors ${
-                      i % 2 === 0 ? "bg-surface-0" : "bg-surface-1"
-                    }`}
+            <>
+              {/* Desktop table (md+) */}
+              <div className="hidden md:block rounded-lg border border-border-default overflow-hidden shadow-elev-1">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border-default bg-surface-1">
+                      <th className="text-left px-4 py-3 text-text-muted font-medium">ID</th>
+                      <th className="text-left px-4 py-3 text-text-muted font-medium">Counterparty</th>
+                      <th className="text-left px-4 py-3 text-text-muted font-medium">Amount</th>
+                      <th className="text-left px-4 py-3 text-text-muted font-medium">Status</th>
+                      <th className="text-left px-4 py-3 text-text-muted font-medium">Created</th>
+                    </tr>
+                  </thead>
+                </table>
+                <VirtualizedList
+                  items={trades}
+                  rowHeight={ROW_HEIGHT}
+                  maxHeight={Math.min(trades.length * ROW_HEIGHT, 600)}
+                  keyExtractor={(trade) => trade.tradeId}
+                  renderItem={(trade, i) => (
+                    <div
+                      className={`grid grid-cols-5 gap-4 px-4 py-3 border-b border-border-default last:border-0 hover:bg-surface-2 transition-colors ${
+                        i % 2 === 0 ? "bg-surface-0" : "bg-surface-1"
+                      }`}
+                    >
+                      <div className="text-gold font-mono">
+                        <Link href={`/trades/${trade.tradeId}`} className="hover:underline underline-offset-4">
+                          {trade.tradeId.slice(0, 8)}...
+                        </Link>
+                      </div>
+                      <div className="text-text-secondary font-mono">{formatAddress(trade.sellerAddress)}</div>
+                      <div className="text-text-primary">{trade.amountCngn} cNGN</div>
+                      <div>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[trade.status] ?? "text-text-muted"}`}>
+                          {trade.status}
+                        </span>
+                      </div>
+                      <div className="text-text-secondary">{formatDate(trade.createdAt)}</div>
+                    </div>
+                  )}
+                />
+              </div>
+
+              {/* Mobile stacked cards (< md) — issue #39 */}
+              <div className="md:hidden flex flex-col gap-3">
+                {trades.map((trade) => (
+                  <Link
+                    key={trade.tradeId}
+                    href={`/trades/${trade.tradeId}`}
+                    className="block rounded-lg border border-border-default bg-surface-1 px-4 py-4 hover:bg-surface-2 transition-colors shadow-elev-1"
                   >
-                    <div className="text-gold font-mono">
-                      <Link
-                        href={`/trades/${trade.tradeId}`}
-                        className="hover:underline underline-offset-4"
-                      >
-                        {trade.tradeId.slice(0, 8)}...
-                      </Link>
-                    </div>
-                    <div className="text-text-secondary font-mono">
-                      {formatAddress(trade.sellerAddress)}
-                    </div>
-                    <div className="text-text-primary">
-                      {trade.amountCngn} cNGN
-                    </div>
-                    <div>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
-                          STATUS_STYLES[trade.status] ?? "text-text-muted"
-                        }`}
-                      >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <span className="text-gold font-mono text-sm">{trade.tradeId.slice(0, 12)}…</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize flex-shrink-0 ${STATUS_STYLES[trade.status] ?? "text-text-muted"}`}>
                         {trade.status}
                       </span>
                     </div>
-                    <div className="text-text-secondary">
-                      {formatDate(trade.createdAt)}
-                    </div>
-                  </div>
-                )}
-              />
-            </div>
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <dt className="text-text-muted">Counterparty</dt>
+                      <dd className="text-text-secondary font-mono truncate">{formatAddress(trade.sellerAddress)}</dd>
+                      <dt className="text-text-muted">Amount</dt>
+                      <dd className="text-text-primary">{trade.amountCngn} cNGN</dd>
+                      <dt className="text-text-muted">Created</dt>
+                      <dd className="text-text-secondary">{formatDate(trade.createdAt)}</dd>
+                    </dl>
+                  </Link>
+                ))}
+              </div>
+            </>
           )}
 
           {/* Pagination */}
