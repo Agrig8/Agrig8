@@ -38,7 +38,7 @@ When a high/critical advisory has no available fix, add a **dated** entry to
       "package": "left-pad",             // informational
       "workspace": "backend",            // "backend" | "frontend" | "contracts"; omit to apply everywhere
       "reason": "No patched release; sink not reachable from request path. Tracking: #1234",
-      "addedBy": "your-handle",
+      "owner": "your-handle-or-team",     // accountable GitHub handle or team. REQUIRED.
       "expires": "2026-11-30"            // YYYY-MM-DD (UTC). REQUIRED.
     }
   ],
@@ -51,7 +51,7 @@ Enforcement rules (`scripts/check-audit-waivers.mjs`):
 - An advisory listed with an **unexpired** waiver for the matching workspace is suppressed.
 - An **expired** waiver **fails the gate** even if the advisory no longer fires — it must be
   renewed (new `expires`) or removed after review.
-- A waiver missing `advisory` or `expires` is a hard error.
+- A waiver missing `advisory`, `owner`, or a valid `expires` (YYYY-MM-DD, real calendar date) is a hard error (exit 2).
 
 Baseline waivers for any pre-existing debt should be added with realistic due dates and a
 tracking issue per entry.
