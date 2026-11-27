@@ -3,7 +3,7 @@ extern crate std;
 use amana_escrow::{EscrowContract, EscrowContractClient, TradeStatus, test_fixture::admin_address};
 use soroban_sdk::{
     Address, Env, String as SorobanString, contract, contractimpl, contracttype,
-    testutils::{Address as _, Ledger},
+    testutils::{Address as _, Events as _, Ledger},
 };
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -276,6 +276,52 @@ fn test_dispute_resolution_moves_trade_to_completed() {
         + tok.balance(&h.admin)
         + tok.balance(&h.escrow);
     assert_eq!(total, 100_000_000);
+
+    h.cleanup();
+}
+
+#[test]
+fn test_dispute_resolution_replay_does_not_repeat_payout_or_event() {
+    let h = H::new();
+    let amount = 100_000_000;
+    let trade_id = h.funded_trade(amount);
+
+    h.c().initiate_dispute(
+        &trade_id,
+        &h.buyer,
+        &SorobanString::from_str(&h.env, "QmReplayProtectionDispute"),
+    );
+    h.c().resolve_dispute(&trade_id, &h.mediator, &3_000u32);
+
+    let events_after_settlement = h.env.events().all().events().len();
+    assert_eq!(events_after_settlement, 1);
+    let balances_after_settlement = (
+        h.tok().balance(&h.buyer),
+        h.tok().balance(&h.seller),
+        h.tok().balance(&h.escrow),
+    );
+
+    let replay = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        h.c().resolve_dispute(&trade_id, &h.mediator, &3_000u32);
+    }));
+
+    assert!(replay.is_err(), "a completed dispute must not settle again");
+    assert_eq!(
+        (
+            h.tok().balance(&h.buyer),
+            h.tok().balance(&h.seller),
+            h.tok().balance(&h.escrow),
+        ),
+        balances_after_settlement
+    );
+    assert!(
+        h.env.events().all().events().len() <= events_after_settlement,
+        "a rejected replay must not emit another settlement event"
+    );
+    assert!(matches!(
+        h.c().get_trade(&trade_id).status,
+        TradeStatus::Completed
+    ));
 
     h.cleanup();
 }
